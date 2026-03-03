@@ -173,10 +173,11 @@ async def test_mock_rule_headers_stored_as_json(store):
 
 
 async def test_mock_rule_response_file(store):
-    rule = MockRule(id="f1", path="/f", response_file="abc123.png")
+    rule = MockRule(id="f1", path="/f", response_file="abc123.png", response_file_data=b"\x89PNG\r\n")
     await store.save_mock_rule(rule)
     r = await store.get_mock_rule("f1")
     assert r["response_file"] == "abc123.png"
+    assert r["response_file_data"] == b"\x89PNG\r\n"
 
 
 # ── Delete requests ──────────────────────────────────────────────

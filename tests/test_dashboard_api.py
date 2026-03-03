@@ -384,40 +384,43 @@ async def test_upload_file(client):
     data = resp.json()
     assert data["original_name"] == "test.png"
     assert data["size"] == len(content)
-    assert data["filename"].endswith(".png")
+    assert "data_b64" in data
 
 
-async def test_serve_uploaded_file(client):
-    content = b"hello world"
-    upload_resp = await client.post(
-        "/api/mock-rules/upload",
-        files={"file": ("test.txt", content, "text/plain")},
-    )
-    filename = upload_resp.json()["filename"]
-    resp = await client.get(f"/api/mock-rules/uploads/{filename}")
-    assert resp.status_code == 200
-    assert resp.content == content
-
-
-async def test_serve_upload_not_found(client):
-    resp = await client.get("/api/mock-rules/uploads/nonexistent.txt")
-    assert resp.status_code == 404
-
-
-async def test_mock_rule_with_response_file(client):
+async def test_mock_rule_with_file_data(client):
+    import base64
     content = b'{"uploaded": true}'
-    upload_resp = await client.post(
-        "/api/mock-rules/upload",
-        files={"file": ("data.json", content, "application/json")},
-    )
-    filename = upload_resp.json()["filename"]
+    b64 = base64.b64encode(content).decode()
 
     resp = await client.post("/api/mock-rules", json={
         "path": "/api/file-test",
         "method": "GET",
         "status_code": 200,
         "content_type": "application/json",
-        "response_file": filename,
+        "response_file": "data.json",
+        "response_file_data_b64": b64,
     })
     assert resp.status_code == 200
-    assert resp.json()["response_file"] == filename
+    assert resp.json()["response_file"] == "data.json"
+
+
+async def test_serve_file_from_rule(client, store):
+    import base64
+    content = b"hello world"
+    b64 = base64.b64encode(content).decode()
+
+    create_resp = await client.post("/api/mock-rules", json={
+        "path": "/api/serve-test",
+        "response_file": "test.txt",
+        "response_file_data_b64": b64,
+        "content_type": "text/plain",
+    })
+    rule_id = create_resp.json()["id"]
+    resp = await client.get(f"/api/mock-rules/uploads/{rule_id}")
+    assert resp.status_code == 200
+    assert resp.content == content
+
+
+async def test_serve_upload_not_found(client):
+    resp = await client.get("/api/mock-rules/uploads/nonexistent")
+    assert resp.status_code == 404

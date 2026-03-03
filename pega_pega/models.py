@@ -58,6 +58,7 @@ class MockRule:
     enabled: bool = True
     priority: int = 0
     response_file: str = ""
+    response_file_data: bytes | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict:

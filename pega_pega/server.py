@@ -169,9 +169,6 @@ class PegaPegaServer:
 
                 if name in ("http", "https"):
                     handler.mock_matcher = self.mock_matcher
-                    handler._uploads_dir = str(
-                        Path(self.config.db_path).resolve().parent / "uploads"
-                    )
 
                 if name == "https" and self._cert_path:
                     handler.cert_path = self._cert_path

@@ -62,6 +62,7 @@ class Store:
                 enabled INTEGER NOT NULL DEFAULT 1,
                 priority INTEGER NOT NULL DEFAULT 0,
                 response_file TEXT NOT NULL DEFAULT '',
+                response_file_data BLOB DEFAULT NULL,
                 created_at TEXT NOT NULL
             )
         """)
@@ -71,6 +72,13 @@ class Store:
         except Exception:
             self._conn.execute(
                 "ALTER TABLE mock_rules ADD COLUMN response_file TEXT NOT NULL DEFAULT ''"
+            )
+        # Migration: add response_file_data column (BLOB) if missing
+        try:
+            self._conn.execute("SELECT response_file_data FROM mock_rules LIMIT 0")
+        except Exception:
+            self._conn.execute(
+                "ALTER TABLE mock_rules ADD COLUMN response_file_data BLOB DEFAULT NULL"
             )
         self._conn.commit()
 
@@ -259,8 +267,8 @@ class Store:
         self._conn.execute(
             """INSERT OR REPLACE INTO mock_rules
                (id, path, method, status_code, response_body, content_type,
-                headers, enabled, priority, response_file, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                headers, enabled, priority, response_file, response_file_data, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 rule.id,
                 rule.path,
@@ -272,6 +280,7 @@ class Store:
                 1 if rule.enabled else 0,
                 rule.priority,
                 rule.response_file,
+                rule.response_file_data,
                 rule.created_at,
             ),
         )

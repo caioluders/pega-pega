@@ -5,13 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 import secrets
-import uuid
 from pathlib import Path
 from typing import Optional
 
 import yaml
 from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect, Query
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -394,10 +393,6 @@ def create_app(
 
     # ── Mock rules API ──────────────────────────────────────────────
 
-    # Uploads directory (next to the database)
-    _uploads_dir = Path(config.db_path).resolve().parent / "uploads" if config else Path("uploads")
-    _uploads_dir.mkdir(parents=True, exist_ok=True)
-
     async def _reload_matcher():
         """Reload mock matcher from database."""
         if mock_matcher is not None:
@@ -420,6 +415,11 @@ def create_app(
         except Exception:
             return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
+        file_data = None
+        if body.get("response_file_data_b64"):
+            import base64
+            file_data = base64.b64decode(body["response_file_data_b64"])
+
         rule = MockRule(
             path=body.get("path", "/"),
             method=body.get("method", "ANY").upper(),
@@ -430,6 +430,7 @@ def create_app(
             enabled=body.get("enabled", True),
             priority=int(body.get("priority", 0)),
             response_file=body.get("response_file", ""),
+            response_file_data=file_data,
         )
         await store.save_mock_rule(rule)
         await _reload_matcher()
@@ -446,6 +447,14 @@ def create_app(
         except Exception:
             return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
+        file_data = existing.get("response_file_data")
+        if body.get("response_file_data_b64"):
+            import base64
+            file_data = base64.b64decode(body["response_file_data_b64"])
+        elif "response_file" in body and not body["response_file"]:
+            # File was cleared
+            file_data = None
+
         rule = MockRule(
             id=rule_id,
             path=body.get("path", existing["path"]),
@@ -457,6 +466,7 @@ def create_app(
             enabled=body.get("enabled", existing["enabled"]),
             priority=int(body.get("priority", existing["priority"])),
             response_file=body.get("response_file", existing.get("response_file", "")),
+            response_file_data=file_data,
             created_at=existing["created_at"],
         )
         await store.save_mock_rule(rule)
@@ -497,6 +507,7 @@ def create_app(
                     enabled=existing["enabled"],
                     priority=i,
                     response_file=existing.get("response_file", ""),
+                    response_file_data=existing.get("response_file_data"),
                     created_at=existing["created_at"],
                 )
                 await store.save_mock_rule(rule)
@@ -508,25 +519,27 @@ def create_app(
     async def upload_mock_file(file: UploadFile):
         if not file.filename:
             return JSONResponse({"error": "No file provided"}, status_code=400)
-        # Limit to 10 MB
         contents = await file.read()
         if len(contents) > 10 * 1024 * 1024:
             return JSONResponse({"error": "File too large (max 10MB)"}, status_code=400)
-        # Save with unique name to avoid collisions
-        ext = Path(file.filename).suffix
-        safe_name = f"{uuid.uuid4().hex}{ext}"
-        dest = _uploads_dir / safe_name
-        dest.write_bytes(contents)
-        return {"filename": safe_name, "original_name": file.filename, "size": len(contents)}
+        # Return file info — actual data is stored when the rule is saved
+        import base64
+        return {
+            "original_name": file.filename,
+            "size": len(contents),
+            "data_b64": base64.b64encode(contents).decode(),
+        }
 
-    @app.get("/api/mock-rules/uploads/{filename}")
-    async def serve_upload(filename: str):
-        # Sanitize: only allow simple filenames (no path traversal)
-        safe = Path(filename).name
-        filepath = _uploads_dir / safe
-        if not filepath.is_file():
+    @app.get("/api/mock-rules/uploads/{rule_id}")
+    async def serve_upload(rule_id: str):
+        rule = await store.get_mock_rule(rule_id)
+        if not rule or not rule.get("response_file_data"):
             return JSONResponse({"error": "Not found"}, status_code=404)
-        return FileResponse(filepath)
+        from starlette.responses import Response
+        return Response(
+            content=rule["response_file_data"],
+            media_type=rule.get("content_type", "application/octet-stream"),
+        )
 
     # ── WebSocket (live feed) ────────────────────────────────────────
 

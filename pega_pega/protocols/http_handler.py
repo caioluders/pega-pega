@@ -29,7 +29,6 @@ class HttpHandler(BaseProtocolHandler):
     name = "HTTP"
     default_port = 80
     mock_matcher = None  # injected by server.py
-    _uploads_dir = None  # injected by server.py
 
     # ------------------------------------------------------------------
     # Server lifecycle
@@ -118,7 +117,7 @@ class HttpHandler(BaseProtocolHandler):
 
                 if mock_rule:
                     logger.info("Mock rule matched: %s %s → rule %s", method, parsed.path, mock_rule.get("id", "?"))
-                    response_bytes = self._build_mock_response(mock_rule, version, self._uploads_dir)
+                    response_bytes = self._build_mock_response(mock_rule, version)
                 else:
                     response_bytes = self._build_response(method, version, parsed.path)
                 try:
@@ -358,7 +357,7 @@ class HttpHandler(BaseProtocolHandler):
         return (status_line + headers).encode() + body
 
     @staticmethod
-    def _build_mock_response(rule: dict, version: str, uploads_dir: str | None = None) -> bytes:
+    def _build_mock_response(rule: dict, version: str) -> bytes:
         """Build an HTTP response from a mock rule."""
         status_code = rule.get("status_code", 200)
         reasons = {
@@ -373,16 +372,10 @@ class HttpHandler(BaseProtocolHandler):
         reason = reasons.get(status_code, "OK")
         content_type = rule.get("content_type", "application/json")
 
-        # Serve uploaded file if set, otherwise use response_body text
-        response_file = rule.get("response_file", "")
-        if response_file and uploads_dir:
-            filepath = Path(uploads_dir) / Path(response_file).name
-            if filepath.is_file():
-                body = filepath.read_bytes()
-                logger.debug("Serving uploaded file: %s (%d bytes)", filepath, len(body))
-            else:
-                logger.warning("Upload file not found: %s", filepath)
-                body = rule.get("response_body", "").encode("utf-8")
+        # Serve file data from DB if available, otherwise use response_body
+        file_data = rule.get("response_file_data")
+        if file_data:
+            body = file_data if isinstance(file_data, bytes) else bytes(file_data)
         else:
             body = rule.get("response_body", "").encode("utf-8")
 

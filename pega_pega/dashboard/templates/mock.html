@@ -436,6 +436,7 @@ async function deleteRule(id) {
 /* ── Modal ────────────────────────────────────────────────────────── */
 function openModal(rule) {
     document.getElementById('formStatus').textContent = '';
+    pendingFileData = null;
     if (rule) {
         document.getElementById('modalTitle').textContent = 'Edit Mock Rule';
         document.getElementById('editId').value = rule.id;
@@ -494,39 +495,41 @@ function addHeaderRow(key, value) {
     hl.appendChild(row);
 }
 
-/* ── File upload ─────────────────────────────────────────────────── */
-async function handleFileUpload(input) {
+/* ── File upload (read as base64, store in DB with rule) ──────────── */
+let pendingFileData = null;  // base64 string of file content
+
+function handleFileUpload(input) {
     const file = input.files[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
+    if (file.size > 10 * 1024 * 1024) {
+        document.getElementById('fileInfo').textContent = 'File too large (max 10MB)';
+        input.value = '';
+        return;
+    }
 
     const infoEl = document.getElementById('fileInfo');
-    infoEl.textContent = 'Uploading...';
+    infoEl.textContent = 'Reading...';
 
-    try {
-        const resp = await fetch('/api/mock-rules/upload', { method: 'POST', body: formData });
-        const data = await resp.json();
-        if (resp.ok) {
-            document.getElementById('fResponseFile').value = data.filename;
-            infoEl.innerHTML = `<span class="file-active">${esc(data.original_name)}</span> (${(data.size / 1024).toFixed(1)} KB)`;
-            document.getElementById('btnClearFile').style.display = '';
-            // Auto-detect content type from extension
-            const ext = file.name.split('.').pop().toLowerCase();
-            const mimeMap = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', svg:'image/svg+xml', pdf:'application/pdf'};
-            if (mimeMap[ext]) {
-                document.getElementById('fContentType').value = mimeMap[ext];
-            }
-        } else {
-            infoEl.textContent = data.error || 'Upload failed';
+    const reader = new FileReader();
+    reader.onload = function() {
+        const b64 = reader.result.split(',')[1];  // strip data:...;base64, prefix
+        pendingFileData = b64;
+        document.getElementById('fResponseFile').value = file.name;
+        infoEl.innerHTML = `<span class="file-active">${esc(file.name)}</span> (${(file.size / 1024).toFixed(1)} KB)`;
+        document.getElementById('btnClearFile').style.display = '';
+        // Auto-detect content type from extension
+        const ext = file.name.split('.').pop().toLowerCase();
+        const mimeMap = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', svg:'image/svg+xml', pdf:'application/pdf'};
+        if (mimeMap[ext]) {
+            document.getElementById('fContentType').value = mimeMap[ext];
         }
-    } catch (e) {
-        infoEl.textContent = 'Upload error';
-    }
+    };
+    reader.readAsDataURL(file);
     input.value = '';
 }
 
 function clearUploadedFile() {
+    pendingFileData = null;
     document.getElementById('fResponseFile').value = '';
     document.getElementById('fileInfo').textContent = '';
     document.getElementById('btnClearFile').style.display = 'none';
@@ -561,6 +564,9 @@ async function saveRule() {
         headers,
         priority: editId ? (rules.find(r => r.id === editId)?.priority || 0) : rules.length,
     };
+    if (pendingFileData) {
+        payload.response_file_data_b64 = pendingFileData;
+    }
 
     const url = editId ? `/api/mock-rules/${editId}` : '/api/mock-rules';
     const method = editId ? 'PUT' : 'POST';
@@ -572,6 +578,7 @@ async function saveRule() {
             body: JSON.stringify(payload),
         });
         if (resp.ok) {
+            pendingFileData = null;
             closeModal();
             loadRules();
         } else {
