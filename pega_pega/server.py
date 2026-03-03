@@ -44,33 +44,46 @@ class PegaPegaServer:
             if not proto_config.enabled:
                 continue
 
-            handler = cls(
-                proto_config=proto_config,
-                global_config=self.config,
-                bus=self.bus,
-            )
+            # Build list of ports: primary + extras
+            ports_to_bind = [proto_config.port]
+            for ep in proto_config.extra_ports:
+                if ep not in ports_to_bind:
+                    ports_to_bind.append(ep)
 
-            # Pass cert paths to HTTPS handler
-            if name == "https" and self._cert_path:
-                handler.cert_path = self._cert_path
-                handler.key_path = self._key_path
+            for port in ports_to_bind:
+                pc = ProtocolConfig(
+                    enabled=True,
+                    port=port,
+                    bind=proto_config.bind,
+                )
+                handler = cls(
+                    proto_config=pc,
+                    global_config=self.config,
+                    bus=self.bus,
+                )
 
-            try:
-                await handler.start()
-                self.handlers.append(handler)
-            except OSError as e:
-                logger.warning(
-                    "[-] %s failed to bind on port %d: %s",
-                    handler.name,
-                    handler.port,
-                    e,
-                )
-            except Exception as e:
-                logger.warning(
-                    "[-] %s failed to start: %s",
-                    handler.name,
-                    e,
-                )
+                # Pass cert paths to HTTPS handler
+                if name == "https" and self._cert_path:
+                    handler.cert_path = self._cert_path
+                    handler.key_path = self._key_path
+
+                try:
+                    await handler.start()
+                    self.handlers.append(handler)
+                except OSError as e:
+                    logger.warning(
+                        "[-] %s failed to bind on port %d: %s",
+                        handler.name,
+                        port,
+                        e,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "[-] %s failed to start on port %d: %s",
+                        handler.name,
+                        port,
+                        e,
+                    )
 
         # Start background store consumer
         asyncio.create_task(store_consumer(self.bus, self.store))

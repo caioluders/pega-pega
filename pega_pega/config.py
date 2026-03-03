@@ -10,6 +10,7 @@ class ProtocolConfig:
     enabled: bool = True
     port: int = 0
     bind: str = ""  # empty = use global bind_ip
+    extra_ports: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -41,17 +42,28 @@ class Config:
         "syslog": 514,
     }, repr=False)
 
+    EXTRA_PORT_DEFAULTS: dict[str, list[int]] = field(default_factory=lambda: {
+        "http": [8080, 8888, 3000, 5000, 8000, 8081],
+        "https": [8443, 4443, 9443],
+    }, repr=False)
+
     def __post_init__(self):
         # Fill in missing protocol configs with defaults
         for name, default_port in self.PROTOCOL_DEFAULTS.items():
             if name not in self.protocols:
-                self.protocols[name] = ProtocolConfig(port=default_port)
+                self.protocols[name] = ProtocolConfig(
+                    port=default_port,
+                    extra_ports=list(self.EXTRA_PORT_DEFAULTS.get(name, [])),
+                )
             else:
                 pc = self.protocols[name]
                 if pc.port == 0:
                     pc.port = default_port
                 if not pc.bind:
                     pc.bind = self.bind_ip
+                # Apply default extra_ports if none configured
+                if not pc.extra_ports and name in self.EXTRA_PORT_DEFAULTS:
+                    pc.extra_ports = list(self.EXTRA_PORT_DEFAULTS[name])
 
         # Apply global bind_ip to protocols that don't have one
         for pc in self.protocols.values():
@@ -68,10 +80,14 @@ class Config:
         protocols = {}
         for name, proto_data in raw.get("protocols", {}).items():
             if isinstance(proto_data, dict):
+                extra = proto_data.get("extra_ports", [])
+                if not isinstance(extra, list):
+                    extra = []
                 protocols[name] = ProtocolConfig(
                     enabled=proto_data.get("enabled", True),
                     port=proto_data.get("port", 0),
                     bind=proto_data.get("bind", ""),
+                    extra_ports=[int(p) for p in extra],
                 )
 
         cfg = cls(
@@ -95,7 +111,11 @@ class Config:
             "dashboard_host": self.dashboard_host,
             "db_path": self.db_path,
             "protocols": {
-                name: {"enabled": pc.enabled, "port": pc.port}
+                name: {
+                    "enabled": pc.enabled,
+                    "port": pc.port,
+                    **({"extra_ports": pc.extra_ports} if pc.extra_ports else {}),
+                }
                 for name, pc in self.protocols.items()
             },
         }

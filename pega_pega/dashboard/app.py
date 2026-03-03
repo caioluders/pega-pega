@@ -133,6 +133,13 @@ def create_app(store: Store, bus: EventBus, config: Config | None = None) -> Fas
                             save_data["protocols"][proto_name]["port"] = int(proto_data["port"])
                         except (ValueError, TypeError):
                             pass
+                    if "extra_ports" in proto_data and isinstance(proto_data["extra_ports"], list):
+                        try:
+                            save_data["protocols"][proto_name]["extra_ports"] = [
+                                int(p) for p in proto_data["extra_ports"]
+                            ]
+                        except (ValueError, TypeError):
+                            pass
 
         try:
             save_path = config._source_path or Path("/etc/pega-pega/config.yaml")

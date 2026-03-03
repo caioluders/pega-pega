@@ -893,17 +893,27 @@ async function loadConfig() {
         for (const [name, proto] of Object.entries(cfg.protocols || {})) {
             const upper = name.toUpperCase();
             const c = PROTO_COLORS[upper] || { bg:'#333', fg:'#aaa' };
+            const extras = (proto.extra_ports || []).join(', ');
+            const allPorts = extras ? `${proto.port}, ${extras}` : `${proto.port}`;
             const row = document.createElement('div');
             row.className = 'proto-toggle';
             row.innerHTML = `
                 <div class="proto-toggle-label">
                     <span class="proto-badge" style="background:${c.bg};color:${c.fg};min-width:70px;">${escapeHtml(upper)}</span>
-                    <span class="proto-toggle-port">:${proto.port}</span>
+                    <span class="proto-toggle-port">:${escapeHtml(allPorts)}</span>
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" data-proto="${escapeHtml(name)}" ${proto.enabled ? 'checked' : ''} />
                     <span class="toggle-slider"></span>
                 </label>`;
+            if (extras) {
+                const portsInput = document.createElement('div');
+                portsInput.style.cssText = 'width:100%;margin-top:4px;';
+                portsInput.innerHTML = `<input type="text" data-extra-ports="${escapeHtml(name)}" value="${escapeHtml(extras)}"
+                    placeholder="Extra ports (comma-separated)"
+                    style="width:100%;background:#1a1a2e;color:#d0d0d0;border:1px solid #333;padding:4px 8px;border-radius:4px;font-size:.75rem;outline:none;" />`;
+                row.appendChild(portsInput);
+            }
             container.appendChild(row);
         }
 
@@ -925,7 +935,12 @@ async function saveConfig() {
         protocols: {},
     };
     document.querySelectorAll('#protocolToggles input[type="checkbox"]').forEach(cb => {
-        config.protocols[cb.dataset.proto] = { enabled: cb.checked };
+        const name = cb.dataset.proto;
+        config.protocols[name] = { enabled: cb.checked };
+        const portsInput = document.querySelector(`input[data-extra-ports="${name}"]`);
+        if (portsInput && portsInput.value.trim()) {
+            config.protocols[name].extra_ports = portsInput.value.split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p));
+        }
     });
 
     try {
