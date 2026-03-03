@@ -29,6 +29,7 @@ class HttpHandler(BaseProtocolHandler):
     name = "HTTP"
     default_port = 80
     mock_matcher = None  # injected by server.py
+    _uploads_dir = None  # injected by server.py
 
     # ------------------------------------------------------------------
     # Server lifecycle
@@ -116,7 +117,8 @@ class HttpHandler(BaseProtocolHandler):
                     mock_rule = self.mock_matcher.match(method, parsed.path)
 
                 if mock_rule:
-                    response_bytes = self._build_mock_response(mock_rule, version)
+                    logger.info("Mock rule matched: %s %s → rule %s", method, parsed.path, mock_rule.get("id", "?"))
+                    response_bytes = self._build_mock_response(mock_rule, version, self._uploads_dir)
                 else:
                     response_bytes = self._build_response(method, version, parsed.path)
                 try:
@@ -356,7 +358,7 @@ class HttpHandler(BaseProtocolHandler):
         return (status_line + headers).encode() + body
 
     @staticmethod
-    def _build_mock_response(rule: dict, version: str) -> bytes:
+    def _build_mock_response(rule: dict, version: str, uploads_dir: str | None = None) -> bytes:
         """Build an HTTP response from a mock rule."""
         status_code = rule.get("status_code", 200)
         reasons = {
@@ -373,16 +375,13 @@ class HttpHandler(BaseProtocolHandler):
 
         # Serve uploaded file if set, otherwise use response_body text
         response_file = rule.get("response_file", "")
-        if response_file:
-            from pathlib import Path
-            uploads_dir = getattr(HttpHandler, '_uploads_dir', None)
-            if uploads_dir:
-                filepath = Path(uploads_dir) / Path(response_file).name
-                if filepath.is_file():
-                    body = filepath.read_bytes()
-                else:
-                    body = rule.get("response_body", "").encode("utf-8")
+        if response_file and uploads_dir:
+            filepath = Path(uploads_dir) / Path(response_file).name
+            if filepath.is_file():
+                body = filepath.read_bytes()
+                logger.debug("Serving uploaded file: %s (%d bytes)", filepath, len(body))
             else:
+                logger.warning("Upload file not found: %s", filepath)
                 body = rule.get("response_body", "").encode("utf-8")
         else:
             body = rule.get("response_body", "").encode("utf-8")
