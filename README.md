@@ -36,6 +36,9 @@ All handlers return **realistic responses** to encourage clients to send full pa
 - **Subdomain tracking** — DNS responds with your IP for all queries, HTTP extracts subdomain from Host header
 - **Rich terminal UI** — color-coded live table with protocol tags
 - **Web dashboard** — real-time updates via WebSocket, filtering, search, hex viewer (port 8443)
+- **Mock HTTP endpoints** — define custom path/method rules with configurable responses (like Beeceptor), accessible at `/mock`
+- **Dashboard authentication** — optional password protection for the web interface
+- **Let's Encrypt SSL** — automatic certificate provisioning via certbot
 - **SQLite persistence** — all captured requests stored and queryable
 - **Configurable** — YAML config to enable/disable protocols, remap ports, set bind addresses
 
@@ -67,14 +70,15 @@ curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh
   --ip 1.2.3.4
 ```
 
-With Let's Encrypt SSL:
+With Let's Encrypt SSL and dashboard password:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh | sudo bash -s -- \
   --domain yourdomain.com \
   --ip 1.2.3.4 \
   --letsencrypt \
-  --email admin@yourdomain.com
+  --email admin@yourdomain.com \
+  --password s3cret
 ```
 
 This clones the repo, installs into `/opt/pega-pega`, creates a systemd service, and starts it. Dashboard will be at `http://server:8443`.
@@ -85,6 +89,7 @@ This clones the repo, installs into `/opt/pega-pega`, creates a systemd service,
   --domain, -d DOMAIN    Base domain for subdomain tracking (default: pega.local)
   --ip, -i IP            IP to return in DNS responses (default: auto-detect)
   --dashboard PORT       Web dashboard port (default: 8443)
+  --password PASS        Set dashboard password (empty = no auth)
   --letsencrypt          Install certbot and enable Let's Encrypt SSL
   --email, -e EMAIL      Email for Let's Encrypt registration
   --no-service           Install only, don't create systemd service
@@ -159,6 +164,18 @@ pega-pega --no-dashboard
   -v, --verbose            Verbose logging
 ```
 
+## Mock HTTP Endpoints
+
+Access the mock rules page at `/mock` on the dashboard. Create rules to return custom HTTP responses:
+
+- **Path matching** — exact paths (`/api/users`) or wildcard patterns (`/api/users/:id`, `/static/*`)
+- **Method filtering** — match specific HTTP methods (GET, POST, etc.) or ANY
+- **Custom responses** — set status code, body, Content-Type, and extra headers per rule
+- **Priority ordering** — rules evaluated top-down, first match wins. Drag to reorder in the UI
+- **Enable/disable** — toggle rules on/off without deleting
+
+Requests matching mock rules are still captured in the main dashboard.
+
 ## Configuration
 
 See [`config.default.yaml`](config.default.yaml) for all options. Key settings:
@@ -168,6 +185,7 @@ bind_ip: "0.0.0.0"
 domain: "yourdomain.com"     # base domain for subdomain tracking
 response_ip: ""              # IP for DNS responses (auto-detect if empty)
 dashboard_port: 8443
+dashboard_password: ""       # empty = no auth; set to protect the dashboard
 db_path: "pega_pega.db"
 
 protocols:
@@ -189,13 +207,15 @@ protocols:
 
 ```
 pega_pega/
-├── models.py            # CapturedRequest dataclass, Protocol enum
+├── models.py            # CapturedRequest, MockRule dataclasses, Protocol enum
 ├── bus.py               # Async fan-out event bus
-├── store.py             # SQLite persistence
+├── store.py             # SQLite persistence (requests + mock rules)
+├── mock.py              # Mock rule matcher (path/method pattern matching)
 ├── display.py           # Rich terminal live table
 ├── server.py            # Main orchestrator
 ├── cli.py               # Click CLI
 ├── certs.py             # Self-signed certificate generation
+├── letsencrypt.py       # Let's Encrypt / certbot integration
 ├── config.py            # YAML config loading
 ├── protocols/           # 14 protocol handlers
 │   ├── base.py          # BaseProtocolHandler ABC
@@ -206,6 +226,9 @@ pega_pega/
 ├── dashboard/           # FastAPI web dashboard
 │   ├── app.py
 │   └── templates/
+│       ├── index.html   # Main dashboard
+│       ├── mock.html    # Mock rules page
+│       └── login.html   # Login page
 └── utils/               # DNS/LDAP/SNMP wire-format parsers
 ```
 
