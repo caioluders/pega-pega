@@ -19,7 +19,8 @@ from starlette.requests import Request
 from .. import __version__
 from ..bus import EventBus
 from ..config import Config
-from ..models import Protocol
+from ..mock import MockMatcher
+from ..models import MockRule, Protocol
 from ..store import Store
 
 # ── Directory resolution (relative to *this* file) ───────────────────
@@ -28,7 +29,12 @@ _TEMPLATES_DIR = _HERE / "templates"
 _STATIC_DIR = _HERE / "static"
 
 
-def create_app(store: Store, bus: EventBus, config: Config | None = None) -> FastAPI:
+def create_app(
+    store: Store,
+    bus: EventBus,
+    config: Config | None = None,
+    mock_matcher: MockMatcher | None = None,
+) -> FastAPI:
     """Factory that wires the dashboard to a shared Store and EventBus."""
 
     app = FastAPI(
@@ -346,6 +352,111 @@ def create_app(store: Store, bus: EventBus, config: Config | None = None) -> Fas
             }
         except UpdateError as e:
             return JSONResponse({"error": str(e)}, status_code=500)
+
+    # ── Mock rules API ──────────────────────────────────────────────
+
+    async def _reload_matcher():
+        """Reload mock matcher from database."""
+        if mock_matcher is not None:
+            rules = await store.list_mock_rules()
+            mock_matcher.reload(rules)
+
+    @app.get("/mock", response_class=HTMLResponse)
+    async def mock_page(request: Request):
+        return templates.TemplateResponse("mock.html", {"request": request})
+
+    @app.get("/api/mock-rules")
+    async def list_mock_rules():
+        rules = await store.list_mock_rules()
+        return {"rules": rules}
+
+    @app.post("/api/mock-rules")
+    async def create_mock_rule(request: Request):
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+        rule = MockRule(
+            path=body.get("path", "/"),
+            method=body.get("method", "ANY").upper(),
+            status_code=int(body.get("status_code", 200)),
+            response_body=body.get("response_body", ""),
+            content_type=body.get("content_type", "application/json"),
+            headers=body.get("headers", {}),
+            enabled=body.get("enabled", True),
+            priority=int(body.get("priority", 0)),
+        )
+        await store.save_mock_rule(rule)
+        await _reload_matcher()
+        return rule.to_dict()
+
+    @app.put("/api/mock-rules/{rule_id}")
+    async def update_mock_rule(rule_id: str, request: Request):
+        existing = await store.get_mock_rule(rule_id)
+        if not existing:
+            return JSONResponse({"error": "Not found"}, status_code=404)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+        rule = MockRule(
+            id=rule_id,
+            path=body.get("path", existing["path"]),
+            method=body.get("method", existing["method"]).upper(),
+            status_code=int(body.get("status_code", existing["status_code"])),
+            response_body=body.get("response_body", existing["response_body"]),
+            content_type=body.get("content_type", existing["content_type"]),
+            headers=body.get("headers", existing["headers"]),
+            enabled=body.get("enabled", existing["enabled"]),
+            priority=int(body.get("priority", existing["priority"])),
+            created_at=existing["created_at"],
+        )
+        await store.save_mock_rule(rule)
+        await _reload_matcher()
+        return rule.to_dict()
+
+    @app.delete("/api/mock-rules/{rule_id}")
+    async def delete_mock_rule(rule_id: str):
+        existing = await store.get_mock_rule(rule_id)
+        if not existing:
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        await store.delete_mock_rule(rule_id)
+        await _reload_matcher()
+        return {"status": "deleted"}
+
+    @app.post("/api/mock-rules/reorder")
+    async def reorder_mock_rules(request: Request):
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+        order = body.get("order", [])
+        if not isinstance(order, list):
+            return JSONResponse({"error": "order must be a list of rule IDs"}, status_code=400)
+
+        for i, rule_id in enumerate(order):
+            existing = await store.get_mock_rule(rule_id)
+            if existing:
+                rule = MockRule(
+                    id=rule_id,
+                    path=existing["path"],
+                    method=existing["method"],
+                    status_code=existing["status_code"],
+                    response_body=existing["response_body"],
+                    content_type=existing["content_type"],
+                    headers=existing["headers"],
+                    enabled=existing["enabled"],
+                    priority=i,
+                    created_at=existing["created_at"],
+                )
+                await store.save_mock_rule(rule)
+
+        await _reload_matcher()
+        return {"status": "ok"}
 
     # ── WebSocket (live feed) ────────────────────────────────────────
 

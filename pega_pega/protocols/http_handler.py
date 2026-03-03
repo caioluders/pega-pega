@@ -28,6 +28,7 @@ JSON_OK_RESPONSE = '{"status":"ok"}'
 class HttpHandler(BaseProtocolHandler):
     name = "HTTP"
     default_port = 80
+    mock_matcher = None  # injected by server.py
 
     # ------------------------------------------------------------------
     # Server lifecycle
@@ -109,8 +110,15 @@ class HttpHandler(BaseProtocolHandler):
                     method, path, source_ip, source_port, host_header,
                 )
 
-                # Send response
-                response_bytes = self._build_response(method, version, parsed.path)
+                # Send response — check mock rules first
+                mock_rule = None
+                if self.mock_matcher:
+                    mock_rule = self.mock_matcher.match(method, parsed.path)
+
+                if mock_rule:
+                    response_bytes = self._build_mock_response(mock_rule, version)
+                else:
+                    response_bytes = self._build_response(method, version, parsed.path)
                 try:
                     writer.write(response_bytes)
                     await writer.drain()
@@ -346,3 +354,33 @@ class HttpHandler(BaseProtocolHandler):
             "\r\n"
         )
         return (status_line + headers).encode() + body
+
+    @staticmethod
+    def _build_mock_response(rule: dict, version: str) -> bytes:
+        """Build an HTTP response from a mock rule."""
+        status_code = rule.get("status_code", 200)
+        reasons = {
+            200: "OK", 201: "Created", 204: "No Content",
+            301: "Moved Permanently", 302: "Found", 304: "Not Modified",
+            400: "Bad Request", 401: "Unauthorized", 403: "Forbidden",
+            404: "Not Found", 405: "Method Not Allowed", 409: "Conflict",
+            422: "Unprocessable Entity", 429: "Too Many Requests",
+            500: "Internal Server Error", 502: "Bad Gateway",
+            503: "Service Unavailable",
+        }
+        reason = reasons.get(status_code, "OK")
+        body = rule.get("response_body", "").encode("utf-8")
+        content_type = rule.get("content_type", "application/json")
+
+        header_lines = [
+            f"{version} {status_code} {reason}\r\n",
+            f"Content-Type: {content_type}\r\n",
+            f"Content-Length: {len(body)}\r\n",
+            "Server: pega-pega\r\n",
+            "Connection: keep-alive\r\n",
+        ]
+        for k, v in rule.get("headers", {}).items():
+            header_lines.append(f"{k}: {v}\r\n")
+        header_lines.append("\r\n")
+
+        return "".join(header_lines).encode() + body

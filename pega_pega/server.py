@@ -8,6 +8,7 @@ import uvicorn
 from .bus import EventBus
 from .certs import generate_self_signed_cert
 from .config import Config, ProtocolConfig
+from .mock import MockMatcher
 from .dashboard.app import create_app
 from .display import TerminalDisplay
 from .letsencrypt import (
@@ -30,11 +31,16 @@ class PegaPegaServer:
         self.store = Store(Path(config.db_path))
         self.display = TerminalDisplay(self.bus)
         self.handlers = []
+        self.mock_matcher = MockMatcher()
         self._cert_path: Path | None = None
         self._key_path: Path | None = None
 
     async def start(self):
         await self.store.initialize()
+
+        # Load mock rules into matcher
+        rules = await self.store.list_mock_rules()
+        self.mock_matcher.reload(rules)
 
         le_cfg = self.config.letsencrypt
         use_le_certs = False
@@ -96,7 +102,7 @@ class PegaPegaServer:
 
         # ── Start web dashboard ───────────────────────────────────────
         if not self.config.no_dashboard:
-            app = create_app(self.store, self.bus, self.config)
+            app = create_app(self.store, self.bus, self.config, self.mock_matcher)
             dashboard_kwargs = {
                 "host": self.config.dashboard_host,
                 "port": self.config.dashboard_port,
@@ -160,6 +166,9 @@ class PegaPegaServer:
                     global_config=self.config,
                     bus=self.bus,
                 )
+
+                if name in ("http", "https"):
+                    handler.mock_matcher = self.mock_matcher
 
                 if name == "https" and self._cert_path:
                     handler.cert_path = self._cert_path

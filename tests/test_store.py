@@ -1,7 +1,7 @@
 import asyncio
 
 from pega_pega.bus import EventBus
-from pega_pega.models import CapturedRequest, Protocol
+from pega_pega.models import CapturedRequest, MockRule, Protocol
 from pega_pega.store import Store, store_consumer
 
 
@@ -123,3 +123,50 @@ async def test_store_consumer_saves_events(tmp_path):
     except asyncio.CancelledError:
         pass
     await s.close()
+
+
+# ── Mock rules ────────────────────────────────────────────────────
+
+
+async def test_save_and_list_mock_rules(store):
+    rule = MockRule(id="r1", path="/api/test", method="GET", status_code=200)
+    await store.save_mock_rule(rule)
+    rules = await store.list_mock_rules()
+    assert len(rules) == 1
+    assert rules[0]["path"] == "/api/test"
+
+
+async def test_get_mock_rule(store):
+    rule = MockRule(id="r2", path="/api/data", method="POST", status_code=201)
+    await store.save_mock_rule(rule)
+    r = await store.get_mock_rule("r2")
+    assert r is not None
+    assert r["method"] == "POST"
+    assert r["status_code"] == 201
+
+
+async def test_get_mock_rule_not_found(store):
+    r = await store.get_mock_rule("nonexistent")
+    assert r is None
+
+
+async def test_delete_mock_rule(store):
+    rule = MockRule(id="r3", path="/api/x")
+    await store.save_mock_rule(rule)
+    await store.delete_mock_rule("r3")
+    assert await store.get_mock_rule("r3") is None
+
+
+async def test_mock_rules_ordered_by_priority(store):
+    await store.save_mock_rule(MockRule(id="a", path="/a", priority=2))
+    await store.save_mock_rule(MockRule(id="b", path="/b", priority=0))
+    await store.save_mock_rule(MockRule(id="c", path="/c", priority=1))
+    rules = await store.list_mock_rules()
+    assert [r["id"] for r in rules] == ["b", "c", "a"]
+
+
+async def test_mock_rule_headers_stored_as_json(store):
+    rule = MockRule(id="h1", path="/h", headers={"X-Custom": "val"})
+    await store.save_mock_rule(rule)
+    r = await store.get_mock_rule("h1")
+    assert r["headers"] == {"X-Custom": "val"}

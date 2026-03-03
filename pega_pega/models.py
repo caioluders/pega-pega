@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -44,3 +44,31 @@ class CapturedRequest:
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), default=str)
+
+
+@dataclass
+class MockRule:
+    id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    path: str = "/"
+    method: str = "ANY"
+    status_code: int = 200
+    response_body: str = ""
+    content_type: str = "application/json"
+    headers: dict = field(default_factory=dict)
+    enabled: bool = True
+    priority: int = 0
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "path": self.path,
+            "method": self.method,
+            "status_code": self.status_code,
+            "response_body": self.response_body,
+            "content_type": self.content_type,
+            "headers": self.headers,
+            "enabled": self.enabled,
+            "priority": self.priority,
+            "created_at": self.created_at,
+        }

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PEGA-PEGA Mock Rules</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d0d1a;
+    color: #d0d0d0;
+    min-height: 100vh;
+}
+a { color: #7ec8e3; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.header {
+    background: linear-gradient(135deg, #0d0d1a 0%, #16213e 100%);
+    border-bottom: 1px solid #1a1a3e;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.logo {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #7ec8e3;
+}
+.nav-links { display: flex; gap: 16px; align-items: center; }
+.nav-links a {
+    color: #8888aa;
+    font-size: .85rem;
+    padding: 4px 10px;
+    border-radius: 4px;
+    transition: background .2s, color .2s;
+}
+.nav-links a:hover, .nav-links a.active {
+    background: #1a1a3e;
+    color: #7ec8e3;
+    text-decoration: none;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid #2a2a4a;
+    background: #12122a;
+    color: #7ec8e3;
+    cursor: pointer;
+    font-size: .85rem;
+    transition: background .2s;
+}
+.btn:hover { background: #1a1a3e; }
+.btn-primary { background: #1a3a5c; border-color: #2a4a7c; font-weight: 600; }
+.btn-primary:hover { background: #224a6c; }
+.btn-danger { background: #5c1a1a; border-color: #7c2a2a; color: #ef9a9a; }
+.btn-danger:hover { background: #6c2424; }
+.btn-sm { padding: 3px 8px; font-size: .75rem; }
+
+/* ── Method badge ─────────────────────────────────────────────────── */
+.method-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: .75rem;
+    font-weight: 700;
+    min-width: 50px;
+    text-align: center;
+}
+.method-GET { background: #1b5e20; color: #a5d6a7; }
+.method-POST { background: #e65100; color: #ffcc80; }
+.method-PUT { background: #1565c0; color: #90caf9; }
+.method-PATCH { background: #6a1b9a; color: #ce93d8; }
+.method-DELETE { background: #b71c1c; color: #ef9a9a; }
+.method-ANY { background: #37474f; color: #b0bec5; }
+
+/* ── Status badge ─────────────────────────────────────────────────── */
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: .75rem;
+    font-weight: 600;
+    font-family: monospace;
+}
+.status-2xx { background: #1b5e20; color: #a5d6a7; }
+.status-3xx { background: #1565c0; color: #90caf9; }
+.status-4xx { background: #e65100; color: #ffcc80; }
+.status-5xx { background: #b71c1c; color: #ef9a9a; }
+
+/* ── Rules list ───────────────────────────────────────────────────── */
+.content { max-width: 1000px; margin: 0 auto; padding: 24px; }
+.rules-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.rules-header h2 { font-size: 1.1rem; color: #d0d0d0; }
+.empty-state {
+    text-align: center;
+    color: #555;
+    padding: 48px 16px;
+    border: 1px dashed #2a2a4a;
+    border-radius: 8px;
+}
+
+.rule-card {
+    background: #12122a;
+    border: 1px solid #1a1a3e;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: grab;
+    transition: border-color .2s, opacity .2s;
+}
+.rule-card:hover { border-color: #2a4a7c; }
+.rule-card.dragging { opacity: 0.4; }
+.rule-card.drag-over { border-color: #7ec8e3; border-style: dashed; }
+.rule-card.disabled { opacity: 0.45; }
+
+.drag-handle {
+    color: #444;
+    font-size: 1.1rem;
+    cursor: grab;
+    user-select: none;
+}
+.rule-info { flex: 1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.rule-path {
+    font-family: monospace;
+    color: #7ec8e3;
+    font-size: .9rem;
+    word-break: break-all;
+}
+.rule-actions { display: flex; gap: 6px; align-items: center; }
+
+/* ── Toggle switch ────────────────────────────────────────────────── */
+.toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background: #333; border-radius: 20px; transition: .3s;
+}
+.toggle-slider::before {
+    content: ''; position: absolute; height: 14px; width: 14px;
+    left: 3px; bottom: 3px; background: #888; border-radius: 50%; transition: .3s;
+}
+input:checked + .toggle-slider { background: #1a5a3a; }
+input:checked + .toggle-slider::before { transform: translateX(16px); background: #4caf50; }
+
+/* ── Modal ────────────────────────────────────────────────────────── */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7); z-index: 100;
+    display: none; align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+    background: #12122a;
+    border: 1px solid #1a1a3e;
+    border-radius: 12px;
+    width: 560px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 24px;
+}
+.modal h3 { font-size: 1.1rem; margin-bottom: 16px; color: #d0d0d0; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+.form-field { margin-bottom: 14px; }
+.form-field label {
+    display: block;
+    font-size: .8rem;
+    color: #888;
+    margin-bottom: 4px;
+}
+.form-field input, .form-field select, .form-field textarea {
+    width: 100%;
+    padding: 8px 12px;
+    background: #0d0d1a;
+    border: 1px solid #2a2a4a;
+    border-radius: 6px;
+    color: #d0d0d0;
+    font-size: .9rem;
+    font-family: inherit;
+    outline: none;
+}
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+    border-color: #7ec8e3;
+}
+.form-field textarea {
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    min-height: 100px;
+    resize: vertical;
+}
+.form-row { display: flex; gap: 12px; }
+.form-row .form-field { flex: 1; }
+
+.form-field select { appearance: none; cursor: pointer; }
+
+.headers-list { margin-top: 4px; }
+.header-row {
+    display: flex; gap: 6px; margin-bottom: 4px; align-items: center;
+}
+.header-row input { flex: 1; }
+.header-row .btn-sm { flex-shrink: 0; }
+
+.status-msg {
+    font-size: .8rem;
+    margin-top: 8px;
+}
+.status-msg.error { color: #e74c3c; }
+.status-msg.success { color: #4caf50; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────── -->
+<div class="header">
+    <div class="header-left">
+        <span class="logo">PEGA-PEGA</span>
+        <div class="nav-links">
+            <a href="/">Dashboard</a>
+            <a href="/mock" class="active">Mock Rules</a>
+        </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+        <button class="btn" id="logoutBtn" onclick="doLogout()" style="display:none;">&#x2190; Logout</button>
+    </div>
+</div>
+
+<!-- ── Content ────────────────────────────────────────────────────── -->
+<div class="content">
+    <div class="rules-header">
+        <h2>Mock HTTP Endpoints</h2>
+        <button class="btn btn-primary" onclick="openModal()">+ Add Rule</button>
+    </div>
+    <div id="rulesList"></div>
+</div>
+
+<!-- ── Add/Edit Modal ─────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+        <h3 id="modalTitle">Add Mock Rule</h3>
+        <input type="hidden" id="editId" value="">
+        <div class="form-field">
+            <label for="fPath">Path Pattern</label>
+            <input type="text" id="fPath" placeholder="/api/users/:id" />
+        </div>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="fMethod">Method</label>
+                <select id="fMethod">
+                    <option value="ANY">ANY</option>
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="DELETE">DELETE</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="fStatus">Status Code</label>
+                <input type="number" id="fStatus" value="200" min="100" max="599" />
+            </div>
+            <div class="form-field">
+                <label for="fContentType">Content-Type</label>
+                <select id="fContentType">
+                    <option value="application/json">application/json</option>
+                    <option value="text/html">text/html</option>
+                    <option value="text/plain">text/plain</option>
+                    <option value="application/xml">application/xml</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-field">
+            <label for="fBody">Response Body</label>
+            <textarea id="fBody" placeholder='{"message": "Hello from mock!"}'></textarea>
+        </div>
+        <div class="form-field">
+            <label>Response Headers <button class="btn btn-sm" type="button" onclick="addHeaderRow()">+ Add</button></label>
+            <div class="headers-list" id="headersList"></div>
+        </div>
+        <div id="formStatus" class="status-msg"></div>
+        <div class="modal-actions">
+            <button class="btn" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveRule()">Save Rule</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+let rules = [];
+let dragSrcIndex = null;
+
+/* ── Load rules ──────────────────────────────────────────────────── */
+async function loadRules() {
+    try {
+        const resp = await fetch('/api/mock-rules');
+        if (resp.status === 401) { window.location.href = '/login'; return; }
+        const data = await resp.json();
+        rules = data.rules || [];
+        renderRules();
+    } catch (e) { console.error('Load rules error', e); }
+}
+
+function statusClass(code) {
+    if (code >= 200 && code < 300) return 'status-2xx';
+    if (code >= 300 && code < 400) return 'status-3xx';
+    if (code >= 400 && code < 500) return 'status-4xx';
+    return 'status-5xx';
+}
+
+function renderRules() {
+    const container = document.getElementById('rulesList');
+    if (rules.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No mock rules yet.</p><p style="margin-top:8px;font-size:.8rem;">Click "Add Rule" to create your first mock HTTP endpoint.</p></div>';
+        return;
+    }
+    container.innerHTML = rules.map((r, i) => `
+        <div class="rule-card ${r.enabled ? '' : 'disabled'}"
+             draggable="true"
+             data-index="${i}"
+             ondragstart="onDragStart(event, ${i})"
+             ondragover="onDragOver(event)"
+             ondragenter="onDragEnter(event)"
+             ondragleave="onDragLeave(event)"
+             ondrop="onDrop(event, ${i})"
+             ondragend="onDragEnd(event)">
+            <span class="drag-handle" title="Drag to reorder">&#x2630;</span>
+            <div class="rule-info">
+                <span class="method-badge method-${r.method}">${esc(r.method)}</span>
+                <span class="rule-path">${esc(r.path)}</span>
+                <span class="status-badge ${statusClass(r.status_code)}">${r.status_code}</span>
+            </div>
+            <div class="rule-actions">
+                <label class="toggle-switch" title="Enable/Disable">
+                    <input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="toggleRule('${r.id}', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+                <button class="btn btn-sm" onclick="editRule('${r.id}')" title="Edit">&#9998;</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteRule('${r.id}')" title="Delete">&#10005;</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function esc(s) { return escapeHtml(s); }
+
+/* ── Drag & drop reorder ─────────────────────────────────────────── */
+function onDragStart(e, index) {
+    dragSrcIndex = index;
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function onDragEnter(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+}
+function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function onDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    document.querySelectorAll('.rule-card').forEach(c => c.classList.remove('drag-over'));
+}
+
+async function onDrop(e, targetIndex) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    if (dragSrcIndex === null || dragSrcIndex === targetIndex) return;
+
+    const moved = rules.splice(dragSrcIndex, 1)[0];
+    rules.splice(targetIndex, 0, moved);
+    renderRules();
+
+    const order = rules.map(r => r.id);
+    await fetch('/api/mock-rules/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order }),
+    });
+    dragSrcIndex = null;
+}
+
+/* ── Toggle enable ───────────────────────────────────────────────── */
+async function toggleRule(id, enabled) {
+    await fetch(`/api/mock-rules/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+    });
+    loadRules();
+}
+
+/* ── Delete ──────────────────────────────────────────────────────── */
+async function deleteRule(id) {
+    if (!confirm('Delete this mock rule?')) return;
+    await fetch(`/api/mock-rules/${id}`, { method: 'DELETE' });
+    loadRules();
+}
+
+/* ── Modal ────────────────────────────────────────────────────────── */
+function openModal(rule) {
+    document.getElementById('formStatus').textContent = '';
+    if (rule) {
+        document.getElementById('modalTitle').textContent = 'Edit Mock Rule';
+        document.getElementById('editId').value = rule.id;
+        document.getElementById('fPath').value = rule.path;
+        document.getElementById('fMethod').value = rule.method;
+        document.getElementById('fStatus').value = rule.status_code;
+        document.getElementById('fContentType').value = rule.content_type;
+        document.getElementById('fBody').value = rule.response_body;
+        const hl = document.getElementById('headersList');
+        hl.innerHTML = '';
+        for (const [k, v] of Object.entries(rule.headers || {})) {
+            addHeaderRow(k, v);
+        }
+    } else {
+        document.getElementById('modalTitle').textContent = 'Add Mock Rule';
+        document.getElementById('editId').value = '';
+        document.getElementById('fPath').value = '';
+        document.getElementById('fMethod').value = 'ANY';
+        document.getElementById('fStatus').value = '200';
+        document.getElementById('fContentType').value = 'application/json';
+        document.getElementById('fBody').value = '';
+        document.getElementById('headersList').innerHTML = '';
+    }
+    document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('show');
+}
+
+function editRule(id) {
+    const rule = rules.find(r => r.id === id);
+    if (rule) openModal(rule);
+}
+
+function addHeaderRow(key, value) {
+    const hl = document.getElementById('headersList');
+    const row = document.createElement('div');
+    row.className = 'header-row';
+    row.innerHTML = `
+        <input type="text" placeholder="Header name" value="${esc(key || '')}" />
+        <input type="text" placeholder="Header value" value="${esc(value || '')}" />
+        <button class="btn btn-sm btn-danger" type="button" onclick="this.parentElement.remove()">&#10005;</button>
+    `;
+    hl.appendChild(row);
+}
+
+async function saveRule() {
+    const statusEl = document.getElementById('formStatus');
+    const editId = document.getElementById('editId').value;
+    const path = document.getElementById('fPath').value.trim();
+    if (!path) {
+        statusEl.textContent = 'Path is required';
+        statusEl.className = 'status-msg error';
+        return;
+    }
+
+    const headers = {};
+    document.querySelectorAll('#headersList .header-row').forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        const k = inputs[0].value.trim();
+        const v = inputs[1].value.trim();
+        if (k) headers[k] = v;
+    });
+
+    const payload = {
+        path,
+        method: document.getElementById('fMethod').value,
+        status_code: parseInt(document.getElementById('fStatus').value) || 200,
+        content_type: document.getElementById('fContentType').value,
+        response_body: document.getElementById('fBody').value,
+        headers,
+        priority: editId ? (rules.find(r => r.id === editId)?.priority || 0) : rules.length,
+    };
+
+    const url = editId ? `/api/mock-rules/${editId}` : '/api/mock-rules';
+    const method = editId ? 'PUT' : 'POST';
+
+    try {
+        const resp = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (resp.ok) {
+            closeModal();
+            loadRules();
+        } else {
+            const data = await resp.json();
+            statusEl.textContent = data.error || 'Save failed';
+            statusEl.className = 'status-msg error';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Network error';
+        statusEl.className = 'status-msg error';
+    }
+}
+
+/* ── Logout ──────────────────────────────────────────────────────── */
+async function doLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+}
+
+/* ── Check if password set (show logout btn) ─────────────────────── */
+async function checkAuth() {
+    try {
+        const resp = await fetch('/api/config');
+        if (resp.ok) {
+            const cfg = await resp.json();
+            if (cfg.password_set) {
+                document.getElementById('logoutBtn').style.display = '';
+            }
+        }
+    } catch {}
+}
+
+/* ── Init ─────────────────────────────────────────────────────────── */
+loadRules();
+checkAuth();
+</script>
+</body>
+</html>

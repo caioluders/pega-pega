@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .bus import EventBus
-from .models import CapturedRequest
+from .models import CapturedRequest, MockRule
 
 
 class Store:
@@ -44,6 +44,20 @@ class Store:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_subdomain ON requests(subdomain)"
         )
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS mock_rules (
+                id TEXT PRIMARY KEY,
+                path TEXT NOT NULL,
+                method TEXT NOT NULL DEFAULT 'ANY',
+                status_code INTEGER NOT NULL DEFAULT 200,
+                response_body TEXT NOT NULL DEFAULT '',
+                content_type TEXT NOT NULL DEFAULT 'application/json',
+                headers TEXT NOT NULL DEFAULT '{}',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                priority INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+        """)
         self._conn.commit()
 
     async def save(self, req: CapturedRequest):
@@ -153,6 +167,80 @@ class Store:
         else:
             cursor = self._conn.execute("SELECT COUNT(*) FROM requests")
         return cursor.fetchone()[0]
+
+    # ── Mock rules ────────────────────────────────────────────────────
+
+    async def save_mock_rule(self, rule: MockRule):
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(self._executor, self._insert_mock_rule, rule)
+
+    def _insert_mock_rule(self, rule: MockRule):
+        self._conn.execute(
+            "INSERT OR REPLACE INTO mock_rules VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (
+                rule.id,
+                rule.path,
+                rule.method,
+                rule.status_code,
+                rule.response_body,
+                rule.content_type,
+                json.dumps(rule.headers, default=str),
+                1 if rule.enabled else 0,
+                rule.priority,
+                rule.created_at,
+            ),
+        )
+        self._conn.commit()
+
+    async def list_mock_rules(self) -> list[dict]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self._list_mock_rules)
+
+    def _list_mock_rules(self) -> list[dict]:
+        cursor = self._conn.execute(
+            "SELECT * FROM mock_rules ORDER BY priority ASC"
+        )
+        columns = [desc[0] for desc in cursor.description]
+        rows = []
+        for row in cursor.fetchall():
+            d = dict(zip(columns, row))
+            d["enabled"] = bool(d["enabled"])
+            if d.get("headers"):
+                try:
+                    d["headers"] = json.loads(d["headers"])
+                except (json.JSONDecodeError, TypeError):
+                    d["headers"] = {}
+            rows.append(d)
+        return rows
+
+    async def get_mock_rule(self, rule_id: str) -> dict | None:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self._get_mock_rule, rule_id)
+
+    def _get_mock_rule(self, rule_id: str) -> dict | None:
+        cursor = self._conn.execute(
+            "SELECT * FROM mock_rules WHERE id = ?", (rule_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        columns = [desc[0] for desc in cursor.description]
+        d = dict(zip(columns, row))
+        d["enabled"] = bool(d["enabled"])
+        if d.get("headers"):
+            try:
+                d["headers"] = json.loads(d["headers"])
+            except (json.JSONDecodeError, TypeError):
+                d["headers"] = {}
+        return d
+
+    async def delete_mock_rule(self, rule_id: str):
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(self._executor, self._delete_mock_rule, rule_id)
+
+    def _delete_mock_rule(self, rule_id: str):
+        self._conn.execute("DELETE FROM mock_rules WHERE id = ?", (rule_id,))
+        self._conn.commit()
 
     async def close(self):
         if self._conn:

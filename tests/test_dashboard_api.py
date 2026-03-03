@@ -219,3 +219,78 @@ async def test_logout_clears_session(auth_client):
         cookies={"session": session_cookie},
     )
     assert resp.status_code == 401
+
+
+# ── Mock rules API tests ─────────────────────────────────────────────
+
+
+async def test_mock_rules_list_empty(client):
+    resp = await client.get("/api/mock-rules")
+    assert resp.status_code == 200
+    assert resp.json()["rules"] == []
+
+
+async def test_mock_rules_create(client):
+    resp = await client.post("/api/mock-rules", json={
+        "path": "/api/test",
+        "method": "GET",
+        "status_code": 200,
+        "response_body": '{"ok":true}',
+        "content_type": "application/json",
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["path"] == "/api/test"
+    assert data["id"]
+
+
+async def test_mock_rules_create_and_list(client):
+    await client.post("/api/mock-rules", json={"path": "/a"})
+    await client.post("/api/mock-rules", json={"path": "/b"})
+    resp = await client.get("/api/mock-rules")
+    assert len(resp.json()["rules"]) == 2
+
+
+async def test_mock_rules_update(client):
+    create_resp = await client.post("/api/mock-rules", json={"path": "/old"})
+    rule_id = create_resp.json()["id"]
+    resp = await client.put(f"/api/mock-rules/{rule_id}", json={"path": "/new"})
+    assert resp.status_code == 200
+    assert resp.json()["path"] == "/new"
+
+
+async def test_mock_rules_update_not_found(client):
+    resp = await client.put("/api/mock-rules/nonexistent", json={"path": "/x"})
+    assert resp.status_code == 404
+
+
+async def test_mock_rules_delete(client):
+    create_resp = await client.post("/api/mock-rules", json={"path": "/del"})
+    rule_id = create_resp.json()["id"]
+    resp = await client.delete(f"/api/mock-rules/{rule_id}")
+    assert resp.status_code == 200
+    # Verify deleted
+    list_resp = await client.get("/api/mock-rules")
+    assert all(r["id"] != rule_id for r in list_resp.json()["rules"])
+
+
+async def test_mock_rules_delete_not_found(client):
+    resp = await client.delete("/api/mock-rules/nonexistent")
+    assert resp.status_code == 404
+
+
+async def test_mock_rules_reorder(client):
+    r1 = (await client.post("/api/mock-rules", json={"path": "/first", "priority": 0})).json()
+    r2 = (await client.post("/api/mock-rules", json={"path": "/second", "priority": 1})).json()
+    # Reverse order
+    resp = await client.post("/api/mock-rules/reorder", json={"order": [r2["id"], r1["id"]]})
+    assert resp.status_code == 200
+    rules = (await client.get("/api/mock-rules")).json()["rules"]
+    assert rules[0]["id"] == r2["id"]
+    assert rules[1]["id"] == r1["id"]
+
+
+async def test_mock_page_accessible(client):
+    resp = await client.get("/mock")
+    assert resp.status_code == 200
+    assert "Mock" in resp.text

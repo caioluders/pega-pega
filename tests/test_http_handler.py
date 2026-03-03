@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pega_pega.config import ProtocolConfig
+from pega_pega.mock import MockMatcher
 from pega_pega.models import Protocol
 from pega_pega.protocols.http_handler import HttpHandler
 
@@ -100,3 +101,50 @@ async def test_handle_connection_empty_data(make_stream_pair, default_config, ev
     await handler._handle_connection(reader, writer)
 
     assert q.empty()
+
+
+async def test_mock_response_served(make_stream_pair, default_config, event_bus):
+    raw = b"GET /api/mock-test HTTP/1.1\r\nHost: pega.local\r\nConnection: close\r\n\r\n"
+    reader, writer = make_stream_pair(raw)
+
+    handler = HttpHandler(
+        ProtocolConfig(port=80, bind="127.0.0.1"),
+        default_config,
+        event_bus,
+    )
+    handler.mock_matcher = MockMatcher([{
+        "path": "/api/mock-test",
+        "method": "GET",
+        "status_code": 418,
+        "response_body": '{"tea":"pot"}',
+        "content_type": "application/json",
+        "headers": {"X-Mock": "true"},
+        "enabled": True,
+        "priority": 0,
+    }])
+    q = event_bus.subscribe()
+    await handler._handle_connection(reader, writer)
+
+    # Request still captured
+    event = q.get_nowait()
+    assert event.protocol == Protocol.HTTP
+    assert event.summary == "GET /api/mock-test"
+
+    # Mock response served
+    written = b"".join(call.args[0] for call in writer.write.call_args_list)
+    assert b"418" in written
+    assert b'{"tea":"pot"}' in written
+    assert b"X-Mock: true" in written
+
+
+def test_build_mock_response():
+    rule = {
+        "status_code": 201,
+        "response_body": '{"created":true}',
+        "content_type": "application/json",
+        "headers": {"Location": "/api/items/1"},
+    }
+    resp = HttpHandler._build_mock_response(rule, "HTTP/1.1")
+    assert b"201 Created" in resp
+    assert b'{"created":true}' in resp
+    assert b"Location: /api/items/1" in resp
