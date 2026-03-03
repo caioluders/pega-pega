@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PEGA-PEGA Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+/* ── Reset & base ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d0d1a;
+    color: #d0d0d0;
+    min-height: 100vh;
+}
+a { color: #7ec8e3; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.header {
+    background: linear-gradient(135deg, #0d0d1a 0%, #16213e 100%);
+    border-bottom: 1px solid #1a1a3e;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.header-title {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #00e5ff;
+    letter-spacing: 3px;
+    text-shadow: 0 0 12px rgba(0, 229, 255, .3);
+}
+.header-subtitle {
+    font-size: .75rem;
+    color: #666;
+    margin-left: 8px;
+}
+.ws-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .8rem;
+    color: #888;
+}
+.ws-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #555;
+    transition: background .3s;
+}
+.ws-dot.connected { background: #00e676; box-shadow: 0 0 6px #00e676; }
+.ws-dot.disconnected { background: #ff1744; box-shadow: 0 0 6px #ff1744; }
+
+/* ── Stats bar ────────────────────────────────────────────────────── */
+.stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 24px;
+    background: #111127;
+    border-bottom: 1px solid #1a1a3e;
+    overflow-x: auto;
+}
+.stat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: .75rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: opacity .2s, transform .15s;
+}
+.stat-badge:hover { opacity: .85; transform: translateY(-1px); }
+.stat-badge .stat-count {
+    background: rgba(0,0,0,.35);
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: .7rem;
+}
+
+/* ── Filter bar ───────────────────────────────────────────────────── */
+.filter-bar {
+    display: flex;
+    gap: 10px;
+    padding: 10px 24px;
+    background: #0f0f22;
+    border-bottom: 1px solid #1a1a3e;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.filter-bar select,
+.filter-bar input {
+    background: #1a1a2e;
+    color: #d0d0d0;
+    border: 1px solid #333;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: .85rem;
+    outline: none;
+}
+.filter-bar select:focus,
+.filter-bar input:focus { border-color: #00e5ff; }
+.filter-bar input { flex: 1; min-width: 180px; }
+.btn {
+    background: #1a1a3e;
+    color: #aaa;
+    border: 1px solid #333;
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .85rem;
+    transition: background .2s, color .2s;
+}
+.btn:hover { background: #292950; color: #fff; }
+.btn-primary { background: #00838f; color: #fff; border-color: #00838f; }
+.btn-primary:hover { background: #00acc1; }
+
+/* ── Main table ───────────────────────────────────────────────────── */
+.table-wrap {
+    padding: 0 24px 24px;
+    overflow-x: auto;
+}
+table.req-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: .85rem;
+}
+table.req-table thead th {
+    background: #16213e;
+    color: #8892b0;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: .75rem;
+    letter-spacing: .5px;
+    border-bottom: 2px solid #1a1a3e;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+table.req-table tbody tr {
+    border-bottom: 1px solid #1a1a2e;
+    cursor: pointer;
+    transition: background .15s;
+}
+table.req-table tbody tr:hover { background: #16213e; }
+table.req-table tbody td {
+    padding: 7px 12px;
+    vertical-align: top;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* New row highlight animation */
+@keyframes rowFlash {
+    0%   { background: rgba(0, 229, 255, .18); }
+    100% { background: transparent; }
+}
+table.req-table tbody tr.new-row {
+    animation: rowFlash 1.5s ease-out;
+}
+
+/* Protocol badge (inline) */
+.proto-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: .75rem;
+    letter-spacing: .5px;
+    text-align: center;
+    min-width: 60px;
+}
+
+/* ── Detail panel ─────────────────────────────────────────────────── */
+.detail-row td {
+    background: #111127 !important;
+    padding: 16px 24px !important;
+    white-space: normal !important;
+    max-width: none !important;
+    cursor: default !important;
+}
+.detail-row:hover { background: none !important; }
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+}
+.detail-section {
+    background: #0d0d1a;
+    border: 1px solid #1a1a3e;
+    border-radius: 6px;
+    padding: 12px;
+}
+.detail-section h4 {
+    color: #00e5ff;
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #1a1a3e;
+    padding-bottom: 4px;
+}
+.detail-section pre {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: .78rem;
+    color: #aaa;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.5;
+    max-height: 350px;
+    overflow-y: auto;
+}
+.detail-section table.kv-table {
+    width: 100%;
+    font-size: .8rem;
+    border-collapse: collapse;
+}
+.kv-table td {
+    padding: 3px 6px;
+    border-bottom: 1px solid #1a1a2e;
+    white-space: normal;
+    max-width: none;
+    cursor: default;
+}
+.kv-table td:first-child {
+    color: #7ec8e3;
+    font-weight: 600;
+    width: 35%;
+    white-space: nowrap;
+}
+
+/* ── Hex viewer ───────────────────────────────────────────────────── */
+.hex-viewer {
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: .75rem;
+    line-height: 1.6;
+    color: #8892b0;
+    background: #080818;
+    padding: 10px;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow: auto;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .header { padding: 10px 12px; }
+    .stats-bar, .filter-bar, .table-wrap { padding-left: 12px; padding-right: 12px; }
+    .detail-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────── -->
+<div class="header">
+    <div>
+        <span class="header-title">PEGA-PEGA</span>
+        <span class="header-subtitle">Multi-Protocol Request Logger</span>
+    </div>
+    <div class="ws-indicator">
+        <span class="ws-dot" id="wsDot"></span>
+        <span id="wsLabel">Connecting...</span>
+    </div>
+</div>
+
+<!-- ── Stats bar ───────────────────────────────────────────────────── -->
+<div class="stats-bar" id="statsBar">
+    <!-- Populated by JS -->
+</div>
+
+<!-- ── Filter bar ──────────────────────────────────────────────────── -->
+<div class="filter-bar">
+    <select id="protoFilter">
+        <option value="">All Protocols</option>
+    </select>
+    <input type="text" id="searchInput" placeholder="Search subdomain, IP, summary..." />
+    <button class="btn btn-primary" id="btnSearch" onclick="applyFilters()">Search</button>
+    <button class="btn" onclick="clearFilters()">Clear</button>
+</div>
+
+<!-- ── Request table ───────────────────────────────────────────────── -->
+<div class="table-wrap">
+    <table class="req-table">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Protocol</th>
+                <th>Source</th>
+                <th>Subdomain</th>
+                <th>Summary</th>
+            </tr>
+        </thead>
+        <tbody id="reqBody">
+            <!-- Populated by JS -->
+        </tbody>
+    </table>
+    <div style="padding:12px 0; display:flex; gap:10px; align-items:center;">
+        <button class="btn" id="btnPrev" onclick="prevPage()" disabled>&laquo; Prev</button>
+        <span id="pageInfo" style="font-size:.8rem; color:#666;">Page 1</span>
+        <button class="btn" id="btnNext" onclick="nextPage()">Next &raquo;</button>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+/* ── Protocol colors (match Rich terminal display) ──────────────── */
+const PROTO_COLORS = {
+    HTTP:       { bg: '#1b5e20', fg: '#a5d6a7' },
+    HTTPS:      { bg: '#2e7d32', fg: '#c8e6c9' },
+    DNS:        { bg: '#006064', fg: '#80deea' },
+    FTP:        { bg: '#f57f17', fg: '#fff9c4' },
+    SMTP:       { bg: '#6a1b9a', fg: '#ce93d8' },
+    POP3:       { bg: '#b71c1c', fg: '#ef9a9a' },
+    IMAP:       { bg: '#4a0000', fg: '#e57373' },
+    SSH:        { bg: '#c62828', fg: '#ffcdd2' },
+    TELNET:     { bg: '#f9a825', fg: '#fff176' },
+    LDAP:       { bg: '#0d47a1', fg: '#90caf9' },
+    MYSQL:      { bg: '#1565c0', fg: '#bbdefb' },
+    RAW_TCP:    { bg: '#424242', fg: '#e0e0e0' },
+    SNMP:       { bg: '#00838f', fg: '#80deea' },
+    SYSLOG:     { bg: '#7b1fa2', fg: '#e1bee7' },
+};
+
+const PROTOCOLS = Object.keys(PROTO_COLORS);
+const PAGE_SIZE = 50;
+
+let currentPage = 0;
+let currentProto = '';
+let currentSearch = '';
+let expandedId = null;
+let ws = null;
+
+/* ── Populate protocol dropdown ─────────────────────────────────── */
+(function initProtoDropdown() {
+    const sel = document.getElementById('protoFilter');
+    PROTOCOLS.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        sel.appendChild(opt);
+    });
+})();
+
+/* ── Stats ───────────────────────────────────────────────────────── */
+async function loadStats() {
+    try {
+        const resp = await fetch('/api/stats');
+        const data = await resp.json();
+        const bar = document.getElementById('statsBar');
+        bar.innerHTML = '';
+        PROTOCOLS.forEach(p => {
+            const count = (data.protocols && data.protocols[p]) || 0;
+            const c = PROTO_COLORS[p];
+            const badge = document.createElement('span');
+            badge.className = 'stat-badge';
+            badge.style.background = c.bg;
+            badge.style.color = c.fg;
+            badge.style.borderColor = c.fg + '33';
+            badge.innerHTML = `${escapeHtml(p)} <span class="stat-count">${count}</span>`;
+            badge.onclick = () => {
+                document.getElementById('protoFilter').value = p;
+                applyFilters();
+            };
+            bar.appendChild(badge);
+        });
+        /* Total */
+        const total = document.createElement('span');
+        total.className = 'stat-badge';
+        total.style.background = '#222';
+        total.style.color = '#aaa';
+        total.style.borderColor = '#555';
+        total.innerHTML = `TOTAL <span class="stat-count">${data.total || 0}</span>`;
+        total.onclick = () => { document.getElementById('protoFilter').value = ''; applyFilters(); };
+        bar.appendChild(total);
+    } catch (e) {
+        console.error('Stats load error', e);
+    }
+}
+
+/* ── Load requests table ─────────────────────────────────────────── */
+async function loadRequests() {
+    const params = new URLSearchParams();
+    if (currentProto) params.set('protocol', currentProto);
+    if (currentSearch) params.set('search', currentSearch);
+    params.set('limit', PAGE_SIZE);
+    params.set('offset', currentPage * PAGE_SIZE);
+
+    try {
+        const resp = await fetch('/api/requests?' + params.toString());
+        const data = await resp.json();
+        renderTable(data.requests || [], false);
+        /* Pagination controls */
+        const total = data.total || 0;
+        const maxPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
+        document.getElementById('btnPrev').disabled = currentPage <= 0;
+        document.getElementById('btnNext').disabled = currentPage >= maxPage;
+        document.getElementById('pageInfo').textContent =
+            `Page ${currentPage + 1} of ${maxPage + 1} (${total} total)`;
+    } catch (e) {
+        console.error('Request load error', e);
+    }
+}
+
+function renderTable(rows, prepend) {
+    const tbody = document.getElementById('reqBody');
+    if (!prepend) {
+        tbody.innerHTML = '';
+        expandedId = null;
+    }
+    rows.forEach((r, idx) => {
+        const tr = buildRow(r);
+        if (prepend) {
+            tr.classList.add('new-row');
+            tbody.insertBefore(tr, tbody.firstChild);
+        } else {
+            tbody.appendChild(tr);
+        }
+    });
+}
+
+function buildRow(r) {
+    const tr = document.createElement('tr');
+    tr.dataset.id = r.id;
+    const c = PROTO_COLORS[r.protocol] || PROTO_COLORS.RAW_TCP;
+
+    tr.innerHTML = `
+        <td>${escapeHtml(formatTime(r.timestamp))}</td>
+        <td><span class="proto-badge" style="background:${c.bg};color:${c.fg}">${escapeHtml(r.protocol)}</span></td>
+        <td>${escapeHtml(r.source_ip)}:${r.source_port || 0}</td>
+        <td>${escapeHtml(r.subdomain || '-')}</td>
+        <td>${escapeHtml((r.summary || '').substring(0, 120))}</td>
+    `;
+    tr.onclick = () => toggleDetail(r.id, tr);
+    return tr;
+}
+
+/* ── Detail expansion ────────────────────────────────────────────── */
+async function toggleDetail(id, rowEl) {
+    /* Collapse if already expanded */
+    const existing = document.querySelector(`tr.detail-row[data-detail-id="${id}"]`);
+    if (existing) {
+        existing.remove();
+        expandedId = null;
+        return;
+    }
+    /* Collapse any other */
+    document.querySelectorAll('tr.detail-row').forEach(el => el.remove());
+
+    try {
+        const resp = await fetch(`/api/requests/${id}`);
+        if (!resp.ok) return;
+        const r = await resp.json();
+
+        const detailTr = document.createElement('tr');
+        detailTr.className = 'detail-row';
+        detailTr.dataset.detailId = id;
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.innerHTML = buildDetailHTML(r);
+        detailTr.appendChild(td);
+        rowEl.insertAdjacentElement('afterend', detailTr);
+        expandedId = id;
+    } catch (e) {
+        console.error('Detail load error', e);
+    }
+}
+
+function buildDetailHTML(r) {
+    let html = '<div class="detail-grid">';
+
+    /* Meta info */
+    html += `<div class="detail-section">
+        <h4>Request Info</h4>
+        <table class="kv-table">
+            <tr><td>ID</td><td>${escapeHtml(r.id)}</td></tr>
+            <tr><td>Timestamp</td><td>${escapeHtml(formatDateTime(r.timestamp))}</td></tr>
+            <tr><td>Protocol</td><td>${escapeHtml(r.protocol)}</td></tr>
+            <tr><td>Source</td><td>${escapeHtml(r.source_ip)}:${r.source_port}</td></tr>
+            <tr><td>Dest Port</td><td>${r.dest_port}</td></tr>
+            <tr><td>Subdomain</td><td>${escapeHtml(r.subdomain || '-')}</td></tr>
+            <tr><td>Summary</td><td>${escapeHtml(r.summary)}</td></tr>
+        </table>
+    </div>`;
+
+    /* Protocol-specific details */
+    html += buildProtocolDetail(r);
+
+    /* Generic details dump */
+    if (r.details && typeof r.details === 'object' && Object.keys(r.details).length > 0) {
+        html += `<div class="detail-section">
+            <h4>All Details</h4>
+            <table class="kv-table">`;
+        for (const [k, v] of Object.entries(r.details)) {
+            const val = (typeof v === 'object') ? JSON.stringify(v, null, 2) : String(v);
+            html += `<tr><td>${escapeHtml(k)}</td><td><pre>${escapeHtml(val)}</pre></td></tr>`;
+        }
+        html += '</table></div>';
+    }
+
+    /* Raw hex viewer */
+    if (r.raw_data && r.raw_data.length > 0) {
+        html += `<div class="detail-section">
+            <h4>Raw Data (Hex)</h4>
+            <div class="hex-viewer">${escapeHtml(hexDump(r.raw_data))}</div>
+        </div>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+function buildProtocolDetail(r) {
+    const d = r.details || {};
+    const proto = r.protocol;
+
+    if (proto === 'HTTP' || proto === 'HTTPS') {
+        let h = '<div class="detail-section"><h4>HTTP Detail</h4>';
+        if (d.method || d.path) {
+            h += `<p style="color:#00e5ff;margin-bottom:8px;"><strong>${escapeHtml(d.method || 'GET')}</strong> ${escapeHtml(d.path || '/')}</p>`;
+        }
+        if (d.host) {
+            h += `<p style="margin-bottom:8px;">Host: <strong>${escapeHtml(d.host)}</strong></p>`;
+        }
+        if (d.headers && typeof d.headers === 'object') {
+            h += '<table class="kv-table">';
+            const hdrs = (typeof d.headers === 'string') ? JSON.parse(d.headers) : d.headers;
+            if (Array.isArray(hdrs)) {
+                hdrs.forEach(pair => {
+                    if (Array.isArray(pair) && pair.length >= 2) {
+                        h += `<tr><td>${escapeHtml(pair[0])}</td><td>${escapeHtml(pair[1])}</td></tr>`;
+                    }
+                });
+            } else {
+                for (const [hk, hv] of Object.entries(hdrs)) {
+                    h += `<tr><td>${escapeHtml(hk)}</td><td>${escapeHtml(hv)}</td></tr>`;
+                }
+            }
+            h += '</table>';
+        }
+        if (d.body) {
+            h += `<h4 style="margin-top:10px;">Body</h4><pre>${escapeHtml(d.body)}</pre>`;
+        }
+        h += '</div>';
+        return h;
+    }
+
+    if (proto === 'DNS') {
+        let h = '<div class="detail-section"><h4>DNS Query</h4>';
+        h += '<table class="kv-table">';
+        if (d.qname) h += `<tr><td>Query Name</td><td>${escapeHtml(d.qname)}</td></tr>`;
+        if (d.qtype) h += `<tr><td>Query Type</td><td>${escapeHtml(d.qtype)}</td></tr>`;
+        if (d.qclass) h += `<tr><td>Query Class</td><td>${escapeHtml(d.qclass)}</td></tr>`;
+        if (d.txn_id !== undefined) h += `<tr><td>Transaction ID</td><td>${d.txn_id}</td></tr>`;
+        if (d.flags !== undefined) h += `<tr><td>Flags</td><td>${escapeHtml(String(d.flags))}</td></tr>`;
+        h += '</table></div>';
+        return h;
+    }
+
+    if (proto === 'SMTP') {
+        let h = '<div class="detail-section"><h4>SMTP Envelope</h4>';
+        h += '<table class="kv-table">';
+        if (d.mail_from) h += `<tr><td>MAIL FROM</td><td>${escapeHtml(d.mail_from)}</td></tr>`;
+        if (d.rcpt_to) {
+            const rcpts = Array.isArray(d.rcpt_to) ? d.rcpt_to.join(', ') : d.rcpt_to;
+            h += `<tr><td>RCPT TO</td><td>${escapeHtml(rcpts)}</td></tr>`;
+        }
+        if (d.ehlo) h += `<tr><td>EHLO</td><td>${escapeHtml(d.ehlo)}</td></tr>`;
+        h += '</table>';
+        if (d.data) {
+            h += `<h4 style="margin-top:10px;">Message Data</h4><pre>${escapeHtml(d.data)}</pre>`;
+        }
+        h += '</div>';
+        return h;
+    }
+
+    if (proto === 'FTP') {
+        let h = '<div class="detail-section"><h4>FTP Session</h4>';
+        if (d.username) h += `<p>User: <strong>${escapeHtml(d.username)}</strong></p>`;
+        if (d.password) h += `<p>Pass: <strong>${escapeHtml(d.password)}</strong></p>`;
+        if (d.commands && Array.isArray(d.commands)) {
+            h += '<pre>' + d.commands.map(c => escapeHtml(c)).join('\n') + '</pre>';
+        }
+        h += '</div>';
+        return h;
+    }
+
+    if (proto === 'SSH') {
+        let h = '<div class="detail-section"><h4>SSH Info</h4>';
+        h += '<table class="kv-table">';
+        if (d.client_version) h += `<tr><td>Client Version</td><td>${escapeHtml(d.client_version)}</td></tr>`;
+        if (d.client_banner) h += `<tr><td>Client Banner</td><td>${escapeHtml(d.client_banner)}</td></tr>`;
+        h += '</table></div>';
+        return h;
+    }
+
+    if (proto === 'POP3' || proto === 'IMAP') {
+        let h = `<div class="detail-section"><h4>${escapeHtml(proto)} Session</h4>`;
+        h += '<table class="kv-table">';
+        if (d.username) h += `<tr><td>Username</td><td>${escapeHtml(d.username)}</td></tr>`;
+        if (d.password) h += `<tr><td>Password</td><td>${escapeHtml(d.password)}</td></tr>`;
+        if (d.commands && Array.isArray(d.commands)) {
+            h += `<tr><td>Commands</td><td><pre>${d.commands.map(c => escapeHtml(c)).join('\n')}</pre></td></tr>`;
+        }
+        h += '</table></div>';
+        return h;
+    }
+
+    if (proto === 'TELNET') {
+        let h = '<div class="detail-section"><h4>Telnet Session</h4>';
+        if (d.input) {
+            h += `<pre>${escapeHtml(d.input)}</pre>`;
+        }
+        h += '</div>';
+        return h;
+    }
+
+    if (proto === 'LDAP') {
+        let h = '<div class="detail-section"><h4>LDAP Request</h4>';
+        h += '<table class="kv-table">';
+        if (d.bind_dn) h += `<tr><td>Bind DN</td><td>${escapeHtml(d.bind_dn)}</td></tr>`;
+        if (d.operation) h += `<tr><td>Operation</td><td>${escapeHtml(d.operation)}</td></tr>`;
+        if (d.base_dn) h += `<tr><td>Base DN</td><td>${escapeHtml(d.base_dn)}</td></tr>`;
+        if (d.filter) h += `<tr><td>Filter</td><td>${escapeHtml(d.filter)}</td></tr>`;
+        h += '</table></div>';
+        return h;
+    }
+
+    if (proto === 'MYSQL') {
+        let h = '<div class="detail-section"><h4>MySQL Connection</h4>';
+        h += '<table class="kv-table">';
+        if (d.username) h += `<tr><td>Username</td><td>${escapeHtml(d.username)}</td></tr>`;
+        if (d.database) h += `<tr><td>Database</td><td>${escapeHtml(d.database)}</td></tr>`;
+        if (d.client_plugin) h += `<tr><td>Auth Plugin</td><td>${escapeHtml(d.client_plugin)}</td></tr>`;
+        h += '</table></div>';
+        return h;
+    }
+
+    if (proto === 'SNMP') {
+        let h = '<div class="detail-section"><h4>SNMP Request</h4>';
+        h += '<table class="kv-table">';
+        if (d.version) h += `<tr><td>Version</td><td>${escapeHtml(d.version)}</td></tr>`;
+        if (d.community) h += `<tr><td>Community</td><td>${escapeHtml(d.community)}</td></tr>`;
+        if (d.pdu_type) h += `<tr><td>PDU Type</td><td>${escapeHtml(d.pdu_type)}</td></tr>`;
+        if (d.oids && Array.isArray(d.oids)) {
+            h += `<tr><td>OIDs</td><td>${d.oids.map(o => escapeHtml(o)).join('<br>')}</td></tr>`;
+        }
+        h += '</table></div>';
+        return h;
+    }
+
+    if (proto === 'SYSLOG') {
+        let h = '<div class="detail-section"><h4>Syslog Message</h4>';
+        h += '<table class="kv-table">';
+        if (d.facility) h += `<tr><td>Facility</td><td>${escapeHtml(d.facility)}</td></tr>`;
+        if (d.severity) h += `<tr><td>Severity</td><td>${escapeHtml(d.severity)}</td></tr>`;
+        if (d.hostname) h += `<tr><td>Hostname</td><td>${escapeHtml(d.hostname)}</td></tr>`;
+        if (d.app_name) h += `<tr><td>App Name</td><td>${escapeHtml(d.app_name)}</td></tr>`;
+        if (d.message) h += `<tr><td>Message</td><td>${escapeHtml(d.message)}</td></tr>`;
+        h += '</table></div>';
+        return h;
+    }
+
+    /* Fallback: nothing extra */
+    return '';
+}
+
+/* ── Filters & pagination ────────────────────────────────────────── */
+function applyFilters() {
+    currentProto = document.getElementById('protoFilter').value;
+    currentSearch = document.getElementById('searchInput').value.trim();
+    currentPage = 0;
+    loadRequests();
+    loadStats();
+}
+function clearFilters() {
+    document.getElementById('protoFilter').value = '';
+    document.getElementById('searchInput').value = '';
+    currentProto = '';
+    currentSearch = '';
+    currentPage = 0;
+    loadRequests();
+    loadStats();
+}
+function prevPage() { if (currentPage > 0) { currentPage--; loadRequests(); } }
+function nextPage() { currentPage++; loadRequests(); }
+
+/* Enter key triggers search */
+document.getElementById('searchInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') applyFilters();
+});
+
+/* ── WebSocket live feed ─────────────────────────────────────────── */
+function connectWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+    ws.onopen = () => {
+        document.getElementById('wsDot').className = 'ws-dot connected';
+        document.getElementById('wsLabel').textContent = 'Live';
+    };
+    ws.onclose = () => {
+        document.getElementById('wsDot').className = 'ws-dot disconnected';
+        document.getElementById('wsLabel').textContent = 'Disconnected';
+        /* Auto-reconnect after 3 seconds */
+        setTimeout(connectWS, 3000);
+    };
+    ws.onerror = () => {
+        document.getElementById('wsDot').className = 'ws-dot disconnected';
+        document.getElementById('wsLabel').textContent = 'Error';
+    };
+    ws.onmessage = (event) => {
+        try {
+            const r = JSON.parse(event.data);
+            /* Only prepend if we are on the first page with no filters */
+            if (currentPage === 0 && !currentProto && !currentSearch) {
+                const tbody = document.getElementById('reqBody');
+                const tr = buildRow(r);
+                tr.classList.add('new-row');
+                tbody.insertBefore(tr, tbody.firstChild);
+                /* Keep table size reasonable */
+                while (tbody.children.length > PAGE_SIZE + 20) {
+                    tbody.removeChild(tbody.lastChild);
+                }
+            }
+            /* Always refresh stats on new event */
+            loadStats();
+        } catch (e) {
+            console.error('WS message parse error', e);
+        }
+    };
+}
+
+/* ── Initial load ────────────────────────────────────────────────── */
+loadStats();
+loadRequests();
+connectWS();
+</script>
+</body>
+</html>

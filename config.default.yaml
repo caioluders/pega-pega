@@ -1,0 +1,49 @@
+bind_ip: "0.0.0.0"
+domain: "pega.local"
+response_ip: ""  # auto-detect; set to your server's public IP
+dashboard_port: 8443
+db_path: "pega_pega.db"
+
+protocols:
+  http:
+    enabled: true
+    port: 80
+  https:
+    enabled: true
+    port: 443
+  dns:
+    enabled: true
+    port: 53
+  ftp:
+    enabled: true
+    port: 21
+  smtp:
+    enabled: true
+    port: 25
+  pop3:
+    enabled: true
+    port: 110
+  imap:
+    enabled: true
+    port: 143
+  ssh:
+    enabled: true
+    port: 22
+  telnet:
+    enabled: true
+    port: 23
+  ldap:
+    enabled: true
+    port: 389
+  mysql:
+    enabled: true
+    port: 3306
+  raw_tcp:
+    enabled: true
+    port: 9999
+  snmp:
+    enabled: true
+    port: 161
+  syslog:
+    enabled: true
+    port: 514
