@@ -37,18 +37,17 @@ class PegaPegaServer:
         await self.store.initialize()
 
         le_cfg = self.config.letsencrypt
-        le_enabled = le_cfg.enabled and le_cfg.email and certbot_available()
         use_le_certs = False
 
         # ── Resolve SSL certificates ──────────────────────────────────
         https_config = self.config.protocols.get("https", ProtocolConfig())
         if https_config.enabled:
-            if le_enabled and le_certs_exist(self.config.domain):
-                # LE certs already on disk
+            if le_cfg.enabled and le_certs_exist(self.config.domain):
+                # LE certs already on disk — use them (no email needed)
                 self._cert_path, self._key_path = get_le_cert_paths(self.config.domain)
                 use_le_certs = True
                 logger.info("Using existing Let's Encrypt certificate for %s", self.config.domain)
-            elif le_enabled:
+            elif le_cfg.enabled and le_cfg.email and certbot_available():
                 # Need to obtain LE cert — start HTTP first for ACME challenge
                 logger.info("Let's Encrypt enabled — starting HTTP handler for ACME challenge...")
                 await self._start_protocol_handlers(only=["http"])
