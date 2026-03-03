@@ -38,7 +38,8 @@ def create_app(store: Store, bus: EventBus, config: Config | None = None) -> Fas
     templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
     # Mount static assets ─────────────────────────────────────────────
-    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+    if _STATIC_DIR.is_dir():
+        app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     # ── HTML ─────────────────────────────────────────────────────────
 

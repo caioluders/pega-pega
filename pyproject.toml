@@ -22,6 +22,13 @@ pega-pega = "pega_pega.cli:main"
 [tool.setuptools.packages.find]
 include = ["pega_pega*"]
 
+[tool.setuptools.package-data]
+pega_pega = [
+    "dashboard/templates/*.html",
+    "dashboard/static/*.js",
+    "dashboard/static/*.css",
+]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
