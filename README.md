@@ -39,6 +39,20 @@ All handlers return **realistic responses** to encourage clients to send full pa
 - **SQLite persistence** — all captured requests stored and queryable
 - **Configurable** — YAML config to enable/disable protocols, remap ports, set bind addresses
 
+## Screenshots
+
+### Terminal UI
+
+<p align="center">
+  <img src="screenshots/cli.svg" alt="Terminal UI" width="100%">
+</p>
+
+### Web Dashboard
+
+<p align="center">
+  <img src="screenshots/dashboard.png" alt="Web Dashboard" width="100%">
+</p>
+
 ## Quick install (on a server)
 
 ```bash
