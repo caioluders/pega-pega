@@ -146,10 +146,35 @@ def create_app(store: Store, bus: EventBus, config: Config | None = None) -> Fas
             save_path = config._source_path or Path("/etc/pega-pega/config.yaml")
             with open(save_path, "w") as f:
                 yaml.dump(save_data, f, default_flow_style=False, sort_keys=False)
+            # Auto-restart the service if running under systemd
+            restarted = False
+            try:
+                import subprocess
+                r = subprocess.run(
+                    ["systemctl", "is-enabled", "--quiet", "pega-pega"],
+                    capture_output=True, timeout=5,
+                )
+                if r.returncode == 0:
+                    subprocess.Popen(
+                        ["systemctl", "restart", "pega-pega"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    )
+                    restarted = True
+            except Exception:
+                pass
+
+            if restarted:
+                return {
+                    "status": "saved",
+                    "path": str(save_path),
+                    "message": "Config saved. Service is restarting...",
+                    "restarting": True,
+                }
             return {
                 "status": "saved",
                 "path": str(save_path),
                 "message": "Config saved. Restart pega-pega for changes to take effect.",
+                "restarting": False,
             }
         except PermissionError:
             return JSONResponse(

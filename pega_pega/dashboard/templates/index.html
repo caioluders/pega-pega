@@ -953,6 +953,9 @@ async function saveConfig() {
         if (resp.ok) {
             statusEl.textContent = data.message || 'Saved!';
             statusEl.className = 'settings-status success';
+            if (data.restarting) {
+                waitForRestart();
+            }
         } else {
             statusEl.textContent = data.error || 'Save failed';
             statusEl.className = 'settings-status error';
@@ -961,7 +964,29 @@ async function saveConfig() {
         statusEl.textContent = 'Network error';
         statusEl.className = 'settings-status error';
     }
-    setTimeout(() => { statusEl.textContent = ''; }, 5000);
+}
+
+function waitForRestart() {
+    const statusEl = document.getElementById('saveStatus');
+    let attempts = 0;
+    const check = setInterval(async () => {
+        attempts++;
+        statusEl.textContent = `Restarting... (${attempts})`;
+        try {
+            const r = await fetch('/api/stats');
+            if (r.ok) {
+                clearInterval(check);
+                statusEl.textContent = 'Restarted! Reloading...';
+                statusEl.className = 'settings-status success';
+                setTimeout(() => window.location.reload(), 500);
+            }
+        } catch (e) { /* still restarting */ }
+        if (attempts > 30) {
+            clearInterval(check);
+            statusEl.textContent = 'Restart taking too long — reload manually';
+            statusEl.className = 'settings-status error';
+        }
+    }, 2000);
 }
 
 async function triggerUpdate() {
