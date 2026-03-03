@@ -103,8 +103,8 @@ class PegaPegaServer:
                 "port": self.config.dashboard_port,
                 "log_level": "warning",
             }
-            # Serve dashboard over HTTPS if we have certs
-            if self._cert_path and self._key_path:
+            # Serve dashboard over HTTPS only with Let's Encrypt certs
+            if use_le_certs and self._cert_path and self._key_path:
                 dashboard_kwargs["ssl_keyfile"] = str(self._key_path)
                 dashboard_kwargs["ssl_certfile"] = str(self._cert_path)
                 proto = "https"
