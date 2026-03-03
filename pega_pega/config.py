@@ -44,7 +44,7 @@ class Config:
 
     EXTRA_PORT_DEFAULTS: dict[str, list[int]] = field(default_factory=lambda: {
         "http": [8080, 8888, 3000, 5000, 8000, 8081],
-        "https": [8443, 4443, 9443],
+        "https": [4443, 9443],
     }, repr=False)
 
     def __post_init__(self):
@@ -69,6 +69,11 @@ class Config:
         for pc in self.protocols.values():
             if not pc.bind:
                 pc.bind = self.bind_ip
+
+        # Prevent protocol handlers from stealing the dashboard port
+        for pc in self.protocols.values():
+            if self.dashboard_port in pc.extra_ports:
+                pc.extra_ports.remove(self.dashboard_port)
 
     @classmethod
     def load(cls, path: Path | None = None) -> "Config":

@@ -12,7 +12,7 @@ protocols:
   https:
     enabled: true
     port: 443
-    extra_ports: [8443, 4443, 9443]
+    extra_ports: [4443, 9443]
   dns:
     enabled: true
     port: 53

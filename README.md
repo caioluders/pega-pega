@@ -15,7 +15,7 @@ Multi-protocol request logger and catcher. Think Responder meets Burp Collaborat
 | Protocol | Default Port | Extra Ports | What's captured |
 |----------|-------------|-------------|-----------------|
 | HTTP | 80 | 8080, 8888, 3000, 5000, 8000, 8081 | Method, path, headers, body, query params |
-| HTTPS | 443 | 8443, 4443, 9443 | Same as HTTP (auto-generated wildcard cert) |
+| HTTPS | 443 | 4443, 9443 | Same as HTTP (auto-generated wildcard cert) |
 | DNS | 53 | Query name, type — responds with your IP |
 | FTP | 21 | Credentials, commands |
 | SMTP | 25 | EHLO, AUTH creds, envelope, mail body |
@@ -166,7 +166,7 @@ protocols:
   https:
     enabled: true
     port: 443
-    extra_ports: [8443, 4443, 9443]
+    extra_ports: [4443, 9443]
   dns:
     enabled: true
     port: 53
