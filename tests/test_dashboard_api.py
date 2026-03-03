@@ -294,3 +294,78 @@ async def test_mock_page_accessible(client):
     resp = await client.get("/mock")
     assert resp.status_code == 200
     assert "Mock" in resp.text
+
+
+# ── Delete request API tests ─────────────────────────────────────
+
+
+async def test_delete_request(client, store, sample_request):
+    await store.save(sample_request)
+    resp = await client.delete(f"/api/requests/{sample_request.id}")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "deleted"
+    # Verify deleted
+    resp2 = await client.get(f"/api/requests/{sample_request.id}")
+    assert resp2.status_code == 404
+
+
+async def test_delete_request_not_found(client):
+    resp = await client.delete("/api/requests/nonexistent")
+    assert resp.status_code == 404
+
+
+async def test_delete_all_requests(client, store):
+    for i in range(3):
+        await store.save(CapturedRequest(id=f"d{i}"))
+    resp = await client.delete("/api/requests")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "deleted"
+    assert data["count"] == 3
+    # Verify empty
+    resp2 = await client.get("/api/requests")
+    assert resp2.json()["total"] == 0
+
+
+# ── Blocked IPs API tests ────────────────────────────────────────
+
+
+async def test_block_ip(client):
+    resp = await client.post("/api/blocked-ips", json={"ip": "10.0.0.1"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "blocked"
+
+
+async def test_block_ip_missing(client):
+    resp = await client.post("/api/blocked-ips", json={})
+    assert resp.status_code == 400
+
+
+async def test_list_blocked_ips(client):
+    await client.post("/api/blocked-ips", json={"ip": "10.0.0.1"})
+    await client.post("/api/blocked-ips", json={"ip": "10.0.0.2"})
+    resp = await client.get("/api/blocked-ips")
+    assert resp.status_code == 200
+    assert len(resp.json()["blocked_ips"]) == 2
+
+
+async def test_unblock_ip(client):
+    await client.post("/api/blocked-ips", json={"ip": "10.0.0.1"})
+    resp = await client.delete("/api/blocked-ips/10.0.0.1")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "unblocked"
+
+
+async def test_unblock_ip_not_found(client):
+    resp = await client.delete("/api/blocked-ips/10.0.0.1")
+    assert resp.status_code == 404
+
+
+async def test_blocked_ip_hides_requests(client, store):
+    await store.save(CapturedRequest(id="h1", source_ip="10.0.0.1"))
+    await store.save(CapturedRequest(id="h2", source_ip="10.0.0.2"))
+    await client.post("/api/blocked-ips", json={"ip": "10.0.0.1"})
+    resp = await client.get("/api/requests")
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["requests"][0]["source_ip"] == "10.0.0.2"

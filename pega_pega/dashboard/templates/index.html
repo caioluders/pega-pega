@@ -321,6 +321,87 @@ table.req-table tbody tr.new-row {
 .toggle-switch input:checked + .toggle-slider { background:#00838f; }
 .toggle-switch input:checked + .toggle-slider::before { transform:translateX(18px); background:#fff; }
 
+/* ── Action menu ──────────────────────────────────────────────────── */
+.action-cell { position: relative; }
+.action-btn {
+    background: #1a1a3e;
+    color: #8892b0;
+    border: 1px solid #333;
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .8rem;
+    transition: background .2s, color .2s;
+}
+.action-btn:hover { background: #292950; color: #fff; }
+.action-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-radius: 6px;
+    min-width: 150px;
+    z-index: 50;
+    box-shadow: 0 4px 16px rgba(0,0,0,.5);
+    overflow: hidden;
+}
+.action-menu.open { display: block; }
+.action-menu-item {
+    display: block;
+    width: 100%;
+    padding: 8px 14px;
+    background: none;
+    border: none;
+    color: #d0d0d0;
+    font-size: .8rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background .15s;
+}
+.action-menu-item:hover { background: #292950; }
+.action-menu-item.danger { color: #ff5252; }
+.action-menu-item.danger:hover { background: #3e1a1a; }
+
+/* ── Pagination ──────────────────────────────────────────────────── */
+.pagination {
+    padding: 12px 0;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.pagination .page-btn {
+    background: #1a1a3e;
+    color: #8892b0;
+    border: 1px solid #333;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .8rem;
+    min-width: 32px;
+    text-align: center;
+    transition: background .2s, color .2s;
+}
+.pagination .page-btn:hover:not(:disabled):not(.active) { background: #292950; color: #fff; }
+.pagination .page-btn.active { background: #00838f; color: #fff; border-color: #00838f; }
+.pagination .page-btn:disabled { opacity: .4; cursor: default; }
+.pagination .page-ellipsis { color: #555; padding: 0 4px; font-size: .8rem; }
+.pagination .page-info { font-size: .8rem; color: #666; margin-left: 8px; }
+.pagination .page-goto {
+    display: flex; align-items: center; gap: 4px; margin-left: 12px;
+}
+.pagination .page-goto input {
+    width: 50px; background: #1a1a2e; color: #d0d0d0; border: 1px solid #333;
+    padding: 4px 6px; border-radius: 4px; font-size: .8rem; outline: none; text-align: center;
+}
+.pagination .page-goto input:focus { border-color: #00e5ff; }
+
+/* ── Clear log button ────────────────────────────────────────────── */
+.btn-danger { background: #5c1a1a; color: #ff5252; border-color: #5c1a1a; }
+.btn-danger:hover { background: #7a2222; color: #ff8a80; }
+
 /* ── Responsive ───────────────────────────────────────────────────── */
 @media (max-width: 768px) {
     .header { padding: 10px 12px; }
@@ -361,6 +442,8 @@ table.req-table tbody tr.new-row {
     <input type="text" id="searchInput" placeholder="Search subdomain, IP, summary..." />
     <button class="btn btn-primary" id="btnSearch" onclick="applyFilters()">Search</button>
     <button class="btn" onclick="clearFilters()">Clear</button>
+    <span style="flex:1;"></span>
+    <button class="btn btn-danger" onclick="clearLog()" title="Delete all captured requests">&#x1f5d1; Clear Log</button>
 </div>
 
 <!-- ── Request table ───────────────────────────────────────────────── -->
@@ -373,16 +456,15 @@ table.req-table tbody tr.new-row {
                 <th>Source</th>
                 <th>Subdomain</th>
                 <th>Summary</th>
+                <th style="width:60px;"></th>
             </tr>
         </thead>
         <tbody id="reqBody">
             <!-- Populated by JS -->
         </tbody>
     </table>
-    <div style="padding:12px 0; display:flex; gap:10px; align-items:center;">
-        <button class="btn" id="btnPrev" onclick="prevPage()" disabled>&laquo; Prev</button>
-        <span id="pageInfo" style="font-size:.8rem; color:#666;">Page 1</span>
-        <button class="btn" id="btnNext" onclick="nextPage()">Next &raquo;</button>
+    <div class="pagination" id="paginationBar">
+        <!-- Populated by JS -->
     </div>
 </div>
 
@@ -552,10 +634,7 @@ async function loadRequests() {
         /* Pagination controls */
         const total = data.total || 0;
         const maxPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
-        document.getElementById('btnPrev').disabled = currentPage <= 0;
-        document.getElementById('btnNext').disabled = currentPage >= maxPage;
-        document.getElementById('pageInfo').textContent =
-            `Page ${currentPage + 1} of ${maxPage + 1} (${total} total)`;
+        renderPagination(currentPage, maxPage, total);
     } catch (e) {
         console.error('Request load error', e);
     }
@@ -589,6 +668,13 @@ function buildRow(r) {
         <td>${escapeHtml(r.source_ip)}:${r.source_port || 0}</td>
         <td>${escapeHtml(r.subdomain || '-')}</td>
         <td>${escapeHtml((r.summary || '').substring(0, 120))}</td>
+        <td class="action-cell">
+            <button class="action-btn" onclick="event.stopPropagation();toggleActionMenu(this)">&#8943;</button>
+            <div class="action-menu">
+                <button class="action-menu-item" onclick="event.stopPropagation();blockIp('${escapeHtml(r.source_ip)}')">&#x1f6ab; Block IP</button>
+                <button class="action-menu-item danger" onclick="event.stopPropagation();deleteRequest('${escapeHtml(r.id)}')">&#x1f5d1; Delete</button>
+            </div>
+        </td>
     `;
     tr.onclick = () => toggleDetail(r.id, tr);
     return tr;
@@ -615,7 +701,7 @@ async function toggleDetail(id, rowEl) {
         detailTr.className = 'detail-row';
         detailTr.dataset.detailId = id;
         const td = document.createElement('td');
-        td.colSpan = 5;
+        td.colSpan = 6;
         td.innerHTML = buildDetailHTML(r);
         detailTr.appendChild(td);
         rowEl.insertAdjacentElement('afterend', detailTr);
@@ -841,8 +927,79 @@ function clearFilters() {
     loadRequests();
     loadStats();
 }
-function prevPage() { if (currentPage > 0) { currentPage--; loadRequests(); } }
-function nextPage() { currentPage++; loadRequests(); }
+function goToPage(p) { currentPage = p; loadRequests(); }
+
+function renderPagination(current, maxPage, total) {
+    const bar = document.getElementById('paginationBar');
+    bar.innerHTML = '';
+    const totalPages = maxPage + 1;
+
+    /* Prev button */
+    const prev = document.createElement('button');
+    prev.className = 'page-btn';
+    prev.innerHTML = '&laquo;';
+    prev.disabled = current <= 0;
+    prev.onclick = () => goToPage(current - 1);
+    bar.appendChild(prev);
+
+    /* Page number buttons */
+    const pages = [];
+    if (totalPages <= 7) {
+        for (let i = 0; i < totalPages; i++) pages.push(i);
+    } else {
+        pages.push(0);
+        if (current > 2) pages.push('...');
+        for (let i = Math.max(1, current - 1); i <= Math.min(maxPage - 1, current + 1); i++) {
+            pages.push(i);
+        }
+        if (current < maxPage - 2) pages.push('...');
+        pages.push(maxPage);
+    }
+
+    pages.forEach(p => {
+        if (p === '...') {
+            const span = document.createElement('span');
+            span.className = 'page-ellipsis';
+            span.textContent = '...';
+            bar.appendChild(span);
+        } else {
+            const btn = document.createElement('button');
+            btn.className = 'page-btn' + (p === current ? ' active' : '');
+            btn.textContent = p + 1;
+            btn.onclick = () => goToPage(p);
+            bar.appendChild(btn);
+        }
+    });
+
+    /* Next button */
+    const next = document.createElement('button');
+    next.className = 'page-btn';
+    next.innerHTML = '&raquo;';
+    next.disabled = current >= maxPage;
+    next.onclick = () => goToPage(current + 1);
+    bar.appendChild(next);
+
+    /* Page info */
+    const info = document.createElement('span');
+    info.className = 'page-info';
+    info.textContent = `${total} total`;
+    bar.appendChild(info);
+
+    /* Go to page */
+    if (totalPages > 1) {
+        const gotoDiv = document.createElement('div');
+        gotoDiv.className = 'page-goto';
+        gotoDiv.innerHTML = `<span style="font-size:.8rem;color:#666;">Go to</span>
+            <input type="number" min="1" max="${totalPages}" placeholder="${current+1}" />`;
+        const input = gotoDiv.querySelector('input');
+        const doGoto = () => {
+            const v = parseInt(input.value);
+            if (v >= 1 && v <= totalPages) goToPage(v - 1);
+        };
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') doGoto(); });
+        bar.appendChild(gotoDiv);
+    }
+}
 
 /* Enter key triggers search */
 document.getElementById('searchInput').addEventListener('keydown', function(e) {
@@ -1135,6 +1292,57 @@ async function requestLeCert() {
     }
     btn.disabled = false;
     btn.textContent = 'Request Certificate';
+}
+
+/* ── Action menu ─────────────────────────────────────────────────── */
+function toggleActionMenu(btn) {
+    /* Close any other open menus */
+    document.querySelectorAll('.action-menu.open').forEach(m => {
+        if (m !== btn.nextElementSibling) m.classList.remove('open');
+    });
+    btn.nextElementSibling.classList.toggle('open');
+}
+/* Close menus on click outside */
+document.addEventListener('click', () => {
+    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
+});
+
+async function deleteRequest(id) {
+    if (!confirm('Delete this request?')) return;
+    try {
+        const resp = await fetch(`/api/requests/${id}`, { method: 'DELETE' });
+        if (resp.ok) {
+            loadRequests();
+            loadStats();
+        }
+    } catch (e) { console.error('Delete error', e); }
+}
+
+async function blockIp(ip) {
+    if (!confirm(`Block all requests from ${ip}? Existing and future requests from this IP will be hidden.`)) return;
+    try {
+        const resp = await fetch('/api/blocked-ips', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip }),
+        });
+        if (resp.ok) {
+            loadRequests();
+            loadStats();
+        }
+    } catch (e) { console.error('Block error', e); }
+}
+
+async function clearLog() {
+    if (!confirm('Delete ALL captured requests? This cannot be undone.')) return;
+    try {
+        const resp = await fetch('/api/requests', { method: 'DELETE' });
+        if (resp.ok) {
+            currentPage = 0;
+            loadRequests();
+            loadStats();
+        }
+    } catch (e) { console.error('Clear log error', e); }
 }
 
 /* ── Logout ──────────────────────────────────────────────────────── */

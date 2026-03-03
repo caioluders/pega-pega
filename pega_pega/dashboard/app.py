@@ -160,6 +160,44 @@ def create_app(
             return JSONResponse({"error": "Not found"}, status_code=404)
         return row
 
+    @app.delete("/api/requests/{request_id}")
+    async def delete_request(request_id: str):
+        deleted = await store.delete_request(request_id)
+        if not deleted:
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        return {"status": "deleted"}
+
+    @app.delete("/api/requests")
+    async def delete_all_requests():
+        count = await store.delete_all_requests()
+        return {"status": "deleted", "count": count}
+
+    # ── Blocked IPs API ───────────────────────────────────────────────
+
+    @app.get("/api/blocked-ips")
+    async def list_blocked_ips():
+        ips = await store.list_blocked_ips()
+        return {"blocked_ips": ips}
+
+    @app.post("/api/blocked-ips")
+    async def block_ip(request: Request):
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+        ip = body.get("ip", "").strip()
+        if not ip:
+            return JSONResponse({"error": "ip is required"}, status_code=400)
+        await store.add_blocked_ip(ip)
+        return {"status": "blocked", "ip": ip}
+
+    @app.delete("/api/blocked-ips/{ip:path}")
+    async def unblock_ip(ip: str):
+        removed = await store.remove_blocked_ip(ip)
+        if not removed:
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        return {"status": "unblocked", "ip": ip}
+
     @app.get("/api/stats")
     async def stats():
         counts: dict[str, int] = {}

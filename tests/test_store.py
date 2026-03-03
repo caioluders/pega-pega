@@ -170,3 +170,74 @@ async def test_mock_rule_headers_stored_as_json(store):
     await store.save_mock_rule(rule)
     r = await store.get_mock_rule("h1")
     assert r["headers"] == {"X-Custom": "val"}
+
+
+# ── Delete requests ──────────────────────────────────────────────
+
+
+async def test_delete_request(store, sample_request):
+    await store.save(sample_request)
+    assert await store.get_by_id("abc123") is not None
+    result = await store.delete_request("abc123")
+    assert result is True
+    assert await store.get_by_id("abc123") is None
+
+
+async def test_delete_request_not_found(store):
+    result = await store.delete_request("nonexistent")
+    assert result is False
+
+
+async def test_delete_all_requests(store):
+    for i in range(5):
+        await store.save(CapturedRequest(id=f"del{i}"))
+    assert await store.count() == 5
+    count = await store.delete_all_requests()
+    assert count == 5
+    assert await store.count() == 0
+
+
+# ── Blocked IPs ──────────────────────────────────────────────────
+
+
+async def test_add_and_list_blocked_ips(store):
+    await store.add_blocked_ip("10.0.0.1")
+    await store.add_blocked_ip("10.0.0.2")
+    ips = await store.list_blocked_ips()
+    assert len(ips) == 2
+    assert {ip["ip"] for ip in ips} == {"10.0.0.1", "10.0.0.2"}
+
+
+async def test_is_ip_blocked(store):
+    assert await store.is_ip_blocked("10.0.0.1") is False
+    await store.add_blocked_ip("10.0.0.1")
+    assert await store.is_ip_blocked("10.0.0.1") is True
+
+
+async def test_remove_blocked_ip(store):
+    await store.add_blocked_ip("10.0.0.1")
+    result = await store.remove_blocked_ip("10.0.0.1")
+    assert result is True
+    assert await store.is_ip_blocked("10.0.0.1") is False
+
+
+async def test_remove_blocked_ip_not_found(store):
+    result = await store.remove_blocked_ip("10.0.0.1")
+    assert result is False
+
+
+async def test_blocked_ip_filtered_from_query(store):
+    await store.save(CapturedRequest(id="b1", source_ip="10.0.0.1"))
+    await store.save(CapturedRequest(id="b2", source_ip="10.0.0.2"))
+    await store.add_blocked_ip("10.0.0.1")
+    rows = await store.query()
+    assert len(rows) == 1
+    assert rows[0]["source_ip"] == "10.0.0.2"
+
+
+async def test_blocked_ip_filtered_from_count(store):
+    await store.save(CapturedRequest(id="c1", source_ip="10.0.0.1", protocol=Protocol.HTTP))
+    await store.save(CapturedRequest(id="c2", source_ip="10.0.0.2", protocol=Protocol.HTTP))
+    await store.add_blocked_ip("10.0.0.1")
+    assert await store.count() == 1
+    assert await store.count(protocol="HTTP") == 1

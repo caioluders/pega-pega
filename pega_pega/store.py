@@ -45,6 +45,12 @@ class Store:
             "CREATE INDEX IF NOT EXISTS idx_subdomain ON requests(subdomain)"
         )
         self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS blocked_ips (
+                ip TEXT PRIMARY KEY,
+                blocked_at TEXT NOT NULL
+            )
+        """)
+        self._conn.execute("""
             CREATE TABLE IF NOT EXISTS mock_rules (
                 id TEXT PRIMARY KEY,
                 path TEXT NOT NULL,
@@ -105,6 +111,11 @@ class Store:
         params: list = []
         conditions = []
 
+        # Filter out blocked IPs
+        conditions.append(
+            "source_ip NOT IN (SELECT ip FROM blocked_ips)"
+        )
+
         if protocol:
             conditions.append("protocol = ?")
             params.append(protocol.upper())
@@ -159,14 +170,76 @@ class Store:
         return await loop.run_in_executor(self._executor, self._count, protocol)
 
     def _count(self, protocol: str | None) -> int:
+        blocked_filter = "source_ip NOT IN (SELECT ip FROM blocked_ips)"
         if protocol:
             cursor = self._conn.execute(
-                "SELECT COUNT(*) FROM requests WHERE protocol = ?",
+                f"SELECT COUNT(*) FROM requests WHERE {blocked_filter} AND protocol = ?",
                 (protocol.upper(),),
             )
         else:
-            cursor = self._conn.execute("SELECT COUNT(*) FROM requests")
+            cursor = self._conn.execute(
+                f"SELECT COUNT(*) FROM requests WHERE {blocked_filter}"
+            )
         return cursor.fetchone()[0]
+
+    # ── Delete requests ─────────────────────────────────────────────
+
+    async def delete_request(self, request_id: str) -> bool:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self._delete_request, request_id)
+
+    def _delete_request(self, request_id: str) -> bool:
+        cursor = self._conn.execute("DELETE FROM requests WHERE id = ?", (request_id,))
+        self._conn.commit()
+        return cursor.rowcount > 0
+
+    async def delete_all_requests(self) -> int:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self._delete_all_requests)
+
+    def _delete_all_requests(self) -> int:
+        cursor = self._conn.execute("DELETE FROM requests")
+        self._conn.commit()
+        return cursor.rowcount
+
+    # ── Blocked IPs ──────────────────────────────────────────────────
+
+    async def add_blocked_ip(self, ip: str):
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(self._executor, self._add_blocked_ip, ip)
+
+    def _add_blocked_ip(self, ip: str):
+        from datetime import datetime, timezone
+        self._conn.execute(
+            "INSERT OR REPLACE INTO blocked_ips VALUES (?, ?)",
+            (ip, datetime.now(timezone.utc).isoformat()),
+        )
+        self._conn.commit()
+
+    async def remove_blocked_ip(self, ip: str) -> bool:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self._remove_blocked_ip, ip)
+
+    def _remove_blocked_ip(self, ip: str) -> bool:
+        cursor = self._conn.execute("DELETE FROM blocked_ips WHERE ip = ?", (ip,))
+        self._conn.commit()
+        return cursor.rowcount > 0
+
+    async def list_blocked_ips(self) -> list[dict]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self._list_blocked_ips)
+
+    def _list_blocked_ips(self) -> list[dict]:
+        cursor = self._conn.execute("SELECT ip, blocked_at FROM blocked_ips ORDER BY blocked_at DESC")
+        return [{"ip": row[0], "blocked_at": row[1]} for row in cursor.fetchall()]
+
+    async def is_ip_blocked(self, ip: str) -> bool:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self._is_ip_blocked, ip)
+
+    def _is_ip_blocked(self, ip: str) -> bool:
+        cursor = self._conn.execute("SELECT 1 FROM blocked_ips WHERE ip = ?", (ip,))
+        return cursor.fetchone() is not None
 
     # ── Mock rules ────────────────────────────────────────────────────
 
