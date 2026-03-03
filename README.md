@@ -76,6 +76,7 @@ This clones the repo, installs into `/opt/pega-pega`, creates a systemd service,
   --ip, -i IP            IP to return in DNS responses (default: auto-detect)
   --dashboard PORT       Web dashboard port (default: 8443)
   --no-service           Install only, don't create systemd service
+  --update               Update existing installation from GitHub
   --uninstall            Remove pega-pega completely
 ```
 
@@ -90,6 +91,11 @@ Manage the service:
 journalctl -u pega-pega -f          # live logs
 systemctl restart pega-pega         # restart
 vim /etc/pega-pega/config.yaml      # edit config
+```
+
+Update to latest version:
+```bash
+curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh | sudo bash -s -- --update
 ```
 
 Uninstall:

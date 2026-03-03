@@ -11,6 +11,7 @@
 #   --ip IP            IP to return in DNS responses (default: auto-detect)
 #   --dashboard PORT   Web dashboard port (default: 8443)
 #   --no-service       Install only, don't create systemd service
+#   --update           Update existing installation from GitHub
 #   --uninstall        Remove pega-pega completely
 #
 
@@ -37,6 +38,7 @@ RESPONSE_IP=""
 DASHBOARD_PORT=""
 NO_SERVICE=false
 UNINSTALL=false
+UPDATE=false
 
 # ── Parse args ────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -45,6 +47,7 @@ while [[ $# -gt 0 ]]; do
         --ip|-i)        RESPONSE_IP="$2"; shift 2 ;;
         --dashboard)    DASHBOARD_PORT="$2"; shift 2 ;;
         --no-service)   NO_SERVICE=true; shift ;;
+        --update)       UPDATE=true; shift ;;
         --uninstall)    UNINSTALL=true; shift ;;
         --help|-h)
             head -14 "$0" 2>/dev/null | tail -11 || true
@@ -67,6 +70,65 @@ if $UNINSTALL; then
     ok "Removed ${INSTALL_DIR}"
     warn "Config left at ${CONFIG_DIR} — remove manually if desired"
     ok "Uninstall complete"
+    exit 0
+fi
+
+# ── Update ───────────────────────────────────────────────────────────
+if $UPDATE; then
+    if [[ $EUID -ne 0 ]]; then
+        err "This script must be run as root"
+        exit 1
+    fi
+
+    if [[ ! -d "${INSTALL_DIR}/src" ]]; then
+        err "pega-pega is not installed at ${INSTALL_DIR}"
+        err "Run the installer first (without --update)"
+        exit 1
+    fi
+
+    echo ""
+    echo -e "${CYAN}  ____  _____ ____    _        ____  _____ ____    _${NC}"
+    echo -e "${CYAN} |  _ \\| ____/ ___|  / \\      |  _ \\| ____/ ___|  / \\${NC}"
+    echo -e "${CYAN} | |_) |  _|| |  _  / _ \\ ____|_) |  _|| |  _  / _ \\${NC}"
+    echo -e "${CYAN} |  __/| |__| |_| |/ ___ \\____|  __/| |__| |_| |/ ___ \\${NC}"
+    echo -e "${CYAN} |_|   |_____\\____/_/   \\_\\   |_|   |_____\\____/_/   \\_\\${NC}"
+    echo ""
+
+    OLD_VERSION=$(${INSTALL_DIR}/venv/bin/python -c 'import pega_pega; print(pega_pega.__version__)' 2>/dev/null || echo "unknown")
+
+    info "Pulling latest from GitHub..."
+    cd "${INSTALL_DIR}/src"
+    git fetch --quiet origin main
+    LOCAL=$(git rev-parse HEAD)
+    REMOTE=$(git rev-parse origin/main)
+
+    if [[ "$LOCAL" == "$REMOTE" ]]; then
+        ok "Already up to date (v${OLD_VERSION})"
+        exit 0
+    fi
+
+    git pull --quiet origin main
+    ok "Downloaded latest changes"
+
+    info "Reinstalling..."
+    "${INSTALL_DIR}/venv/bin/pip" install --quiet --upgrade "${INSTALL_DIR}/src"
+    NEW_VERSION=$(${INSTALL_DIR}/venv/bin/python -c 'import pega_pega; print(pega_pega.__version__)' 2>/dev/null || echo "unknown")
+
+    if systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null; then
+        info "Restarting service..."
+        systemctl restart "$SERVICE_NAME"
+        sleep 2
+        if systemctl is-active --quiet "$SERVICE_NAME"; then
+            ok "Updated ${OLD_VERSION} → ${NEW_VERSION} and restarted"
+        else
+            err "Service failed to start after update"
+            err "Check logs: journalctl -u ${SERVICE_NAME} -e"
+            exit 1
+        fi
+    else
+        ok "Updated ${OLD_VERSION} → ${NEW_VERSION}"
+        warn "No systemd service found — restart manually"
+    fi
     exit 0
 fi
 
