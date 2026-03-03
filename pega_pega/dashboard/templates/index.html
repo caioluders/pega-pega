@@ -421,6 +421,28 @@ table.req-table tbody tr.new-row {
             <span id="saveStatus" class="settings-status"></span>
         </div>
         <div class="settings-section">
+            <h3>Let's Encrypt</h3>
+            <p class="settings-note">Obtain free SSL certificates from Let's Encrypt. Requires a real domain pointed at this server and certbot installed.</p>
+            <div class="proto-toggle" style="border-bottom:none;margin-bottom:8px;">
+                <div class="proto-toggle-label">
+                    <span style="color:#d0d0d0;">Enable Let's Encrypt</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="cfgLeEnabled" />
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="settings-field">
+                <label for="cfgLeEmail">Email (required by Let's Encrypt)</label>
+                <input type="text" id="cfgLeEmail" placeholder="admin@example.com" />
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:12px;">
+                <button class="btn btn-primary" id="btnLeCert" onclick="requestLeCert()">Request Certificate</button>
+                <span id="leStatus" class="settings-status"></span>
+            </div>
+            <div id="leCertInfo" style="margin-top:8px;font-size:.8rem;color:#666;"></div>
+        </div>
+        <div class="settings-section">
             <h3>Software Update</h3>
             <div class="settings-field">
                 <label>Current Version</label>
@@ -918,8 +940,36 @@ async function loadConfig() {
         }
 
         document.getElementById('currentVersion').textContent = 'v' + (cfg._version || '?');
+
+        /* Let's Encrypt config */
+        const le = cfg.letsencrypt || {};
+        document.getElementById('cfgLeEnabled').checked = !!le.enabled;
+        document.getElementById('cfgLeEmail').value = le.email || '';
+
+        /* Load LE cert status */
+        loadLeStatus();
+
         settingsLoaded = true;
     } catch (e) { console.error('Config load error', e); }
+}
+
+async function loadLeStatus() {
+    try {
+        const resp = await fetch('/api/letsencrypt/status');
+        if (!resp.ok) return;
+        const st = await resp.json();
+        const info = document.getElementById('leCertInfo');
+        let html = '';
+        if (!st.certbot_available) {
+            html = '<span style="color:#ff1744;">certbot not installed</span>';
+        } else if (st.certificate_exists) {
+            const expiry = st.expiry ? new Date(st.expiry).toLocaleDateString() : '?';
+            html = `<span style="color:#00e676;">Certificate active for ${escapeHtml(st.domain)}</span> &mdash; expires ${expiry}`;
+        } else {
+            html = '<span style="color:#888;">No certificate yet</span>';
+        }
+        info.innerHTML = html;
+    } catch (e) { console.error('LE status error', e); }
 }
 
 async function saveConfig() {
@@ -932,6 +982,11 @@ async function saveConfig() {
         response_ip: document.getElementById('cfgResponseIp').value,
         bind_ip: document.getElementById('cfgBindIp').value,
         dashboard_port: parseInt(document.getElementById('cfgDashboardPort').value) || 8443,
+        letsencrypt: {
+            enabled: document.getElementById('cfgLeEnabled').checked,
+            email: document.getElementById('cfgLeEmail').value,
+            agree_tos: document.getElementById('cfgLeEnabled').checked,
+        },
         protocols: {},
     };
     document.querySelectorAll('#protocolToggles input[type="checkbox"]').forEach(cb => {
@@ -1018,6 +1073,46 @@ async function triggerUpdate() {
     }
     btn.disabled = false;
     btn.textContent = 'Check for Updates';
+}
+
+/* ── Let's Encrypt cert request ──────────────────────────────────── */
+async function requestLeCert() {
+    const btn = document.getElementById('btnLeCert');
+    const statusEl = document.getElementById('leStatus');
+    const email = document.getElementById('cfgLeEmail').value.trim();
+
+    if (!email) {
+        statusEl.textContent = 'Email is required';
+        statusEl.className = 'settings-status error';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Requesting...';
+    statusEl.textContent = 'Running certbot (this may take a minute)...';
+    statusEl.className = 'settings-status';
+
+    try {
+        const resp = await fetch('/api/letsencrypt/obtain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            statusEl.textContent = data.message;
+            statusEl.className = 'settings-status success';
+            loadLeStatus();
+        } else {
+            statusEl.textContent = data.error || 'Request failed';
+            statusEl.className = 'settings-status error';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Network error';
+        statusEl.className = 'settings-status error';
+    }
+    btn.disabled = false;
+    btn.textContent = 'Request Certificate';
 }
 
 /* ── Initial load ────────────────────────────────────────────────── */

@@ -67,6 +67,16 @@ curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh
   --ip 1.2.3.4
 ```
 
+With Let's Encrypt SSL:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh | sudo bash -s -- \
+  --domain yourdomain.com \
+  --ip 1.2.3.4 \
+  --letsencrypt \
+  --email admin@yourdomain.com
+```
+
 This clones the repo, installs into `/opt/pega-pega`, creates a systemd service, and starts it. Dashboard will be at `http://server:8443`.
 
 ### Install options
@@ -75,6 +85,8 @@ This clones the repo, installs into `/opt/pega-pega`, creates a systemd service,
   --domain, -d DOMAIN    Base domain for subdomain tracking (default: pega.local)
   --ip, -i IP            IP to return in DNS responses (default: auto-detect)
   --dashboard PORT       Web dashboard port (default: 8443)
+  --letsencrypt          Install certbot and enable Let's Encrypt SSL
+  --email, -e EMAIL      Email for Let's Encrypt registration
   --no-service           Install only, don't create systemd service
   --update               Update existing installation from GitHub
   --uninstall            Remove pega-pega completely

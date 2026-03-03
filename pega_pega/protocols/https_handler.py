@@ -20,12 +20,12 @@ class HttpsHandler(HttpHandler):
     # ------------------------------------------------------------------
 
     async def start(self):
-        ssl_ctx = self._ensure_ssl_context()
+        self._ssl_ctx = self._ensure_ssl_context()
         server = await asyncio.start_server(
             self._handle_connection,
             host=self.bind,
             port=self.port,
-            ssl=ssl_ctx,
+            ssl=self._ssl_ctx,
         )
         self._servers.append(server)
         logger.info("HTTPS handler listening on %s:%d", self.bind, self.port)
@@ -35,22 +35,36 @@ class HttpsHandler(HttpHandler):
     # ------------------------------------------------------------------
 
     def _ensure_ssl_context(self):
-        """Load or create a self-signed certificate, then return an SSLContext."""
-        cert_path = CERT_DIR / "server.pem"
-        key_path = CERT_DIR / "server-key.pem"
+        """Load certificate from injected paths, or generate self-signed."""
+        # Use injected cert paths (set by server.py) if available
+        cert_path = getattr(self, "cert_path", None)
+        key_path = getattr(self, "key_path", None)
 
-        if not cert_path.exists() or not key_path.exists():
+        if cert_path and key_path and Path(cert_path).exists() and Path(key_path).exists():
+            logger.info("HTTPS: using certificate %s", cert_path)
+            return create_ssl_context(Path(cert_path), Path(key_path))
+
+        # Fall back to self-signed
+        ss_cert = CERT_DIR / "server.pem"
+        ss_key = CERT_DIR / "server-key.pem"
+
+        if not ss_cert.exists() or not ss_key.exists():
             domain = self.global_config.domain
             logger.info(
                 "HTTPS: generating self-signed certificate for %s (dir=%s)",
                 domain, CERT_DIR,
             )
-            cert_path, key_path = generate_self_signed_cert(
+            ss_cert, ss_key = generate_self_signed_cert(
                 domain=domain,
                 cert_dir=CERT_DIR,
             )
 
-        return create_ssl_context(cert_path, key_path)
+        return create_ssl_context(ss_cert, ss_key)
+
+    def reload_ssl_context(self):
+        """Rebuild SSL context (e.g. after certificate renewal)."""
+        self._ssl_ctx = self._ensure_ssl_context()
+        logger.info("HTTPS: reloaded SSL context on port %d", self.port)
 
     # ------------------------------------------------------------------
     # Override emit to tag protocol as HTTPS

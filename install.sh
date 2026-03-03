@@ -10,6 +10,8 @@
 #   --domain DOMAIN    Base domain for subdomain tracking (default: pega.local)
 #   --ip IP            IP to return in DNS responses (default: auto-detect)
 #   --dashboard PORT   Web dashboard port (default: 8443)
+#   --letsencrypt      Install certbot and enable Let's Encrypt SSL
+#   --email EMAIL      Email for Let's Encrypt registration
 #   --no-service       Install only, don't create systemd service
 #   --update           Update existing installation from GitHub
 #   --uninstall        Remove pega-pega completely
@@ -39,6 +41,8 @@ DASHBOARD_PORT=""
 NO_SERVICE=false
 UNINSTALL=false
 UPDATE=false
+LETSENCRYPT=false
+LE_EMAIL=""
 
 # ── Parse args ────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -49,6 +53,8 @@ while [[ $# -gt 0 ]]; do
         --no-service)   NO_SERVICE=true; shift ;;
         --update)       UPDATE=true; shift ;;
         --uninstall)    UNINSTALL=true; shift ;;
+        --letsencrypt)  LETSENCRYPT=true; shift ;;
+        --email|-e)     LE_EMAIL="$2"; shift 2 ;;
         --help|-h)
             head -14 "$0" 2>/dev/null | tail -11 || true
             exit 0
@@ -229,6 +235,53 @@ if [[ ! -f "${CONFIG_DIR}/config.yaml" ]]; then
     ok "Config written to ${CONFIG_DIR}/config.yaml"
 else
     warn "Existing config preserved at ${CONFIG_DIR}/config.yaml"
+fi
+
+# ── Let's Encrypt ────────────────────────────────────────────────
+if $LETSENCRYPT; then
+    if ! command -v certbot &>/dev/null; then
+        info "Installing certbot..."
+        if command -v apt-get &>/dev/null; then
+            apt-get update -qq && apt-get install -y -qq certbot >/dev/null 2>&1
+        elif command -v dnf &>/dev/null; then
+            dnf install -y -q certbot >/dev/null 2>&1
+        elif command -v yum &>/dev/null; then
+            yum install -y -q certbot >/dev/null 2>&1
+        elif command -v pacman &>/dev/null; then
+            pacman -S --noconfirm certbot >/dev/null 2>&1
+        else
+            warn "Could not install certbot automatically — install it manually"
+        fi
+        if command -v certbot &>/dev/null; then
+            ok "certbot installed"
+        else
+            warn "certbot installation failed — install manually: apt install certbot"
+        fi
+    else
+        ok "certbot already installed"
+    fi
+
+    # Enable LE in config
+    if [[ -f "${CONFIG_DIR}/config.yaml" ]]; then
+        if ! grep -q "letsencrypt:" "${CONFIG_DIR}/config.yaml"; then
+            cat >> "${CONFIG_DIR}/config.yaml" << LEEOF
+
+letsencrypt:
+  enabled: true
+  email: "${LE_EMAIL}"
+  agree_tos: true
+LEEOF
+        else
+            sed -i "/letsencrypt:/,/agree_tos:/{
+                s/enabled:.*/enabled: true/
+                s/email:.*/email: \"${LE_EMAIL}\"/
+                s/agree_tos:.*/agree_tos: true/
+            }" "${CONFIG_DIR}/config.yaml"
+        fi
+        ok "Let's Encrypt enabled in config"
+    fi
+
+    mkdir -p /tmp/pega-pega-acme
 fi
 
 # ── Systemd service ───────────────────────────────────────────────────

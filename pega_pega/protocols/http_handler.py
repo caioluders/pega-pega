@@ -2,9 +2,13 @@ import asyncio
 import logging
 from urllib.parse import urlparse, parse_qs
 
+from pathlib import Path
+
 from .base import BaseProtocolHandler
 from ..models import CapturedRequest, Protocol
 from ..utils.subdomain import extract_subdomain
+
+ACME_WEBROOT = Path("/tmp/pega-pega-acme")
 
 logger = logging.getLogger("pega-pega")
 
@@ -106,7 +110,7 @@ class HttpHandler(BaseProtocolHandler):
                 )
 
                 # Send response
-                response_bytes = self._build_response(method, version)
+                response_bytes = self._build_response(method, version, parsed.path)
                 try:
                     writer.write(response_bytes)
                     await writer.drain()
@@ -302,8 +306,30 @@ class HttpHandler(BaseProtocolHandler):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _build_response(method: str, version: str) -> bytes:
-        """Build a realistic HTTP response."""
+    def _build_response(method: str, version: str, path: str = "/") -> bytes:
+        """Build a realistic HTTP response.
+
+        Serves ACME challenge tokens for Let's Encrypt webroot validation.
+        """
+        # Serve ACME challenge files for Let's Encrypt
+        acme_prefix = "/.well-known/acme-challenge/"
+        if path.startswith(acme_prefix):
+            token = path[len(acme_prefix):]
+            # Sanitize: only allow alphanumeric, dash, underscore, dot
+            if token and all(c.isalnum() or c in "-_." for c in token):
+                challenge_file = ACME_WEBROOT / ".well-known" / "acme-challenge" / token
+                if challenge_file.exists():
+                    body = challenge_file.read_bytes()
+                    status_line = f"{version} 200 OK\r\n"
+                    headers = (
+                        "Content-Type: text/plain\r\n"
+                        f"Content-Length: {len(body)}\r\n"
+                        "Server: pega-pega\r\n"
+                        "Connection: close\r\n"
+                        "\r\n"
+                    )
+                    return (status_line + headers).encode() + body
+
         if method.upper() in ("POST", "PUT", "PATCH", "DELETE"):
             body = JSON_OK_RESPONSE.encode()
             content_type = "application/json"

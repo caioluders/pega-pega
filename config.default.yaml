@@ -4,6 +4,11 @@ response_ip: ""  # auto-detect; set to your server's public IP
 dashboard_port: 8443
 db_path: "pega_pega.db"
 
+letsencrypt:
+  enabled: false
+  email: ""
+  agree_tos: false
+
 protocols:
   http:
     enabled: true

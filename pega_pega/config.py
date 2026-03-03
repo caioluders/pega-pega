@@ -6,6 +6,13 @@ import yaml
 
 
 @dataclass
+class LetsEncryptConfig:
+    enabled: bool = False
+    email: str = ""
+    agree_tos: bool = False
+
+
+@dataclass
 class ProtocolConfig:
     enabled: bool = True
     port: int = 0
@@ -22,6 +29,7 @@ class Config:
     dashboard_host: str = "0.0.0.0"
     db_path: str = "pega_pega.db"
     no_dashboard: bool = False
+    letsencrypt: LetsEncryptConfig = field(default_factory=LetsEncryptConfig)
     protocols: dict[str, ProtocolConfig] = field(default_factory=dict)
     _source_path: Path | None = field(default=None, init=False, repr=False, compare=False)
 
@@ -95,6 +103,16 @@ class Config:
                     extra_ports=[int(p) for p in extra],
                 )
 
+        le_raw = raw.get("letsencrypt", {})
+        if isinstance(le_raw, dict):
+            le_config = LetsEncryptConfig(
+                enabled=bool(le_raw.get("enabled", False)),
+                email=str(le_raw.get("email", "")),
+                agree_tos=bool(le_raw.get("agree_tos", False)),
+            )
+        else:
+            le_config = LetsEncryptConfig()
+
         cfg = cls(
             bind_ip=raw.get("bind_ip", "0.0.0.0"),
             domain=raw.get("domain", "pega.local"),
@@ -102,6 +120,7 @@ class Config:
             dashboard_port=raw.get("dashboard_port", 8443),
             dashboard_host=raw.get("dashboard_host", "0.0.0.0"),
             db_path=raw.get("db_path", "pega_pega.db"),
+            letsencrypt=le_config,
             protocols=protocols,
         )
         cfg._source_path = path
@@ -115,6 +134,11 @@ class Config:
             "dashboard_port": self.dashboard_port,
             "dashboard_host": self.dashboard_host,
             "db_path": self.db_path,
+            "letsencrypt": {
+                "enabled": self.letsencrypt.enabled,
+                "email": self.letsencrypt.email,
+                "agree_tos": self.letsencrypt.agree_tos,
+            },
             "protocols": {
                 name: {
                     "enabled": pc.enabled,

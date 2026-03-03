@@ -124,6 +124,15 @@ def create_app(store: Store, bus: EventBus, config: Config | None = None) -> Fas
             except (ValueError, TypeError):
                 pass
 
+        if "letsencrypt" in body and isinstance(body["letsencrypt"], dict):
+            le = body["letsencrypt"]
+            if "enabled" in le:
+                save_data["letsencrypt"]["enabled"] = bool(le["enabled"])
+            if "email" in le and isinstance(le["email"], str):
+                save_data["letsencrypt"]["email"] = le["email"]
+            if "agree_tos" in le:
+                save_data["letsencrypt"]["agree_tos"] = bool(le["agree_tos"])
+
         if "protocols" in body and isinstance(body["protocols"], dict):
             for proto_name, proto_data in body["protocols"].items():
                 if proto_name in save_data["protocols"] and isinstance(proto_data, dict):
@@ -183,6 +192,65 @@ def create_app(store: Store, bus: EventBus, config: Config | None = None) -> Fas
             )
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=500)
+
+    # ── Let's Encrypt API ────────────────────────────────────────────
+
+    @app.get("/api/letsencrypt/status")
+    async def le_status():
+        from ..letsencrypt import certbot_available, le_certs_exist, get_cert_expiry
+
+        domain = config.domain if config else "unknown"
+        has_certs = le_certs_exist(domain)
+        expiry = get_cert_expiry(domain)
+        return {
+            "certbot_available": certbot_available(),
+            "enabled": config.letsencrypt.enabled if config else False,
+            "domain": domain,
+            "certificate_exists": has_certs,
+            "expiry": expiry.isoformat() if expiry else None,
+        }
+
+    @app.post("/api/letsencrypt/obtain")
+    async def le_obtain(request: Request):
+        from ..letsencrypt import certbot_available, obtain_certificate, le_certs_exist
+
+        if not certbot_available():
+            return JSONResponse(
+                {"error": "certbot is not installed on this server"},
+                status_code=400,
+            )
+
+        if config is None:
+            return JSONResponse({"error": "Config not available"}, status_code=503)
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        email = body.get("email", "") or (config.letsencrypt.email if config else "")
+        domain = config.domain if config else ""
+
+        if not email:
+            return JSONResponse({"error": "Email is required"}, status_code=400)
+        if not domain or domain == "pega.local":
+            return JSONResponse(
+                {"error": "Set a real domain in config before requesting a certificate"},
+                status_code=400,
+            )
+
+        loop = asyncio.get_running_loop()
+        ok = await loop.run_in_executor(None, obtain_certificate, domain, email)
+
+        if ok and le_certs_exist(domain):
+            return {
+                "status": "success",
+                "message": f"Certificate obtained for {domain}. Restart pega-pega to use it.",
+            }
+        return JSONResponse(
+            {"error": "Certificate request failed. Check server logs for details."},
+            status_code=500,
+        )
 
     @app.post("/api/update")
     async def trigger_update():
