@@ -412,6 +412,11 @@ table.req-table tbody tr.new-row {
                 <label for="cfgDashboardPort">Dashboard Port</label>
                 <input type="number" id="cfgDashboardPort" placeholder="8443" />
             </div>
+            <div class="settings-field">
+                <label for="cfgPassword">Dashboard Password</label>
+                <input type="password" id="cfgPassword" placeholder="empty = no auth" />
+                <span id="passwordHint" style="font-size:.75rem;color:#666;margin-top:2px;"></span>
+            </div>
         </div>
         <div class="settings-section">
             <h3>Protocols</h3>
@@ -911,6 +916,11 @@ async function loadConfig() {
         document.getElementById('cfgBindIp').value = cfg.bind_ip || '';
         document.getElementById('cfgDashboardPort').value = cfg.dashboard_port || '';
 
+        document.getElementById('cfgPassword').value = '';
+        document.getElementById('passwordHint').textContent = cfg.password_set
+            ? 'Password is set. Leave blank to keep current.'
+            : 'No password set. Dashboard is public.';
+
         const container = document.getElementById('protocolToggles');
         container.innerHTML = '';
         for (const [name, proto] of Object.entries(cfg.protocols || {})) {
@@ -995,6 +1005,11 @@ async function saveConfig() {
         },
         protocols: {},
     };
+
+    const pw = document.getElementById('cfgPassword').value;
+    if (pw !== '') {
+        config.dashboard_password = pw;
+    }
     document.querySelectorAll('#protocolToggles input[type="checkbox"]').forEach(cb => {
         const name = cb.dataset.proto;
         config.protocols[name] = { enabled: cb.checked };
