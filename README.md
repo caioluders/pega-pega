@@ -39,7 +39,51 @@ All handlers return **realistic responses** to encourage clients to send full pa
 - **SQLite persistence** — all captured requests stored and queryable
 - **Configurable** — YAML config to enable/disable protocols, remap ports, set bind addresses
 
-## Install
+## Quick install (on a server)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh | sudo bash
+```
+
+With options:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh | sudo bash -s -- \
+  --domain yourdomain.com \
+  --ip 1.2.3.4
+```
+
+This clones the repo, installs into `/opt/pega-pega`, creates a systemd service, and starts it. Dashboard will be at `http://server:8443`.
+
+### Install options
+
+```
+  --domain, -d DOMAIN    Base domain for subdomain tracking (default: pega.local)
+  --ip, -i IP            IP to return in DNS responses (default: auto-detect)
+  --dashboard PORT       Web dashboard port (default: 8443)
+  --no-service           Install only, don't create systemd service
+  --uninstall            Remove pega-pega completely
+```
+
+### After installing
+
+Point your domain's DNS to the server:
+- Set a wildcard A record: `*.yourdomain.com → server_ip`
+- Or set an NS record so pega-pega handles DNS directly
+
+Manage the service:
+```bash
+journalctl -u pega-pega -f          # live logs
+systemctl restart pega-pega         # restart
+vim /etc/pega-pega/config.yaml      # edit config
+```
+
+Uninstall:
+```bash
+curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh | sudo bash -s -- --uninstall
+```
+
+## Local development
 
 ```bash
 git clone https://github.com/caioluders/pega-pega.git
@@ -47,6 +91,7 @@ cd pega-pega
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
+sudo pega-pega
 ```
 
 ## Usage
@@ -63,9 +108,6 @@ pega-pega -d yourdomain.com -r 1.2.3.4
 
 # Custom config file
 pega-pega -c config.default.yaml
-
-# High ports for unprivileged testing
-pega-pega -p http,raw_tcp -c my-config.yaml
 
 # Disable web dashboard
 pega-pega --no-dashboard
@@ -84,19 +126,6 @@ pega-pega --no-dashboard
   -p, --protocols LIST     Comma-separated list of protocols to enable
   -v, --verbose            Verbose logging
 ```
-
-## Deploy to a server
-
-```bash
-./deploy.sh root@your-server-ip
-./deploy.sh root@your-server-ip --config my-config.yaml
-```
-
-The deploy script builds a wheel, uploads it via SCP, installs into `/opt/pega-pega`, deploys the config to `/etc/pega-pega/config.yaml`, and creates a systemd service.
-
-After deploying, point your domain's DNS to the server:
-- Set a wildcard A record: `*.yourdomain.com → server_ip`
-- Or set an NS record so pega-pega handles DNS directly
 
 ## Configuration
 
