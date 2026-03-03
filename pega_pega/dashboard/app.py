@@ -7,13 +7,16 @@ import json
 from pathlib import Path
 from typing import Optional
 
+import yaml
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
+from .. import __version__
 from ..bus import EventBus
+from ..config import Config
 from ..models import Protocol
 from ..store import Store
 
@@ -23,7 +26,7 @@ _TEMPLATES_DIR = _HERE / "templates"
 _STATIC_DIR = _HERE / "static"
 
 
-def create_app(store: Store, bus: EventBus) -> FastAPI:
+def create_app(store: Store, bus: EventBus, config: Config | None = None) -> FastAPI:
     """Factory that wires the dashboard to a shared Store and EventBus."""
 
     app = FastAPI(
@@ -86,6 +89,84 @@ def create_app(store: Store, bus: EventBus) -> FastAPI:
             counts[proto.value] = c
         total = await store.count()
         return {"protocols": counts, "total": total}
+
+    # ── Config / Settings API ────────────────────────────────────────
+
+    @app.get("/api/config")
+    async def get_config():
+        if config is None:
+            return JSONResponse({"error": "Config not available"}, status_code=503)
+        data = config.to_dict()
+        data["_version"] = __version__
+        data["_source_path"] = str(config._source_path) if config._source_path else None
+        return data
+
+    @app.put("/api/config")
+    async def update_config(request: Request):
+        if config is None:
+            return JSONResponse({"error": "Config not available"}, status_code=503)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+        save_data = config.to_dict()
+
+        for key in ("bind_ip", "domain", "response_ip", "dashboard_host"):
+            if key in body and isinstance(body[key], str):
+                save_data[key] = body[key]
+
+        if "dashboard_port" in body:
+            try:
+                save_data["dashboard_port"] = int(body["dashboard_port"])
+            except (ValueError, TypeError):
+                pass
+
+        if "protocols" in body and isinstance(body["protocols"], dict):
+            for proto_name, proto_data in body["protocols"].items():
+                if proto_name in save_data["protocols"] and isinstance(proto_data, dict):
+                    if "enabled" in proto_data:
+                        save_data["protocols"][proto_name]["enabled"] = bool(proto_data["enabled"])
+                    if "port" in proto_data:
+                        try:
+                            save_data["protocols"][proto_name]["port"] = int(proto_data["port"])
+                        except (ValueError, TypeError):
+                            pass
+
+        try:
+            save_path = config._source_path or Path("/etc/pega-pega/config.yaml")
+            with open(save_path, "w") as f:
+                yaml.dump(save_data, f, default_flow_style=False, sort_keys=False)
+            return {
+                "status": "saved",
+                "path": str(save_path),
+                "message": "Config saved. Restart pega-pega for changes to take effect.",
+            }
+        except PermissionError:
+            return JSONResponse(
+                {"error": f"Permission denied writing to {save_path}"},
+                status_code=403,
+            )
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+    @app.post("/api/update")
+    async def trigger_update():
+        from ..updater import perform_update, UpdateError
+
+        loop = asyncio.get_running_loop()
+        try:
+            result = await loop.run_in_executor(None, perform_update)
+            return {
+                "status": "success" if not result.already_up_to_date else "up_to_date",
+                "old_version": result.old_version,
+                "new_version": result.new_version,
+                "restarted": result.restarted,
+                "message": result.message,
+            }
+        except UpdateError as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
 
     # ── WebSocket (live feed) ────────────────────────────────────────
 

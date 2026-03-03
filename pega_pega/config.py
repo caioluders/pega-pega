@@ -22,6 +22,7 @@ class Config:
     db_path: str = "pega_pega.db"
     no_dashboard: bool = False
     protocols: dict[str, ProtocolConfig] = field(default_factory=dict)
+    _source_path: Path | None = field(default=None, init=False, repr=False, compare=False)
 
     PROTOCOL_DEFAULTS: dict[str, int] = field(default_factory=lambda: {
         "http": 80,
@@ -73,7 +74,7 @@ class Config:
                     bind=proto_data.get("bind", ""),
                 )
 
-        return cls(
+        cfg = cls(
             bind_ip=raw.get("bind_ip", "0.0.0.0"),
             domain=raw.get("domain", "pega.local"),
             response_ip=raw.get("response_ip", ""),
@@ -82,6 +83,28 @@ class Config:
             db_path=raw.get("db_path", "pega_pega.db"),
             protocols=protocols,
         )
+        cfg._source_path = path
+        return cfg
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "bind_ip": self.bind_ip,
+            "domain": self.domain,
+            "response_ip": self.response_ip,
+            "dashboard_port": self.dashboard_port,
+            "dashboard_host": self.dashboard_host,
+            "db_path": self.db_path,
+            "protocols": {
+                name: {"enabled": pc.enabled, "port": pc.port}
+                for name, pc in self.protocols.items()
+            },
+        }
+
+    def save(self, path: Path | None = None) -> Path:
+        save_path = path or self._source_path or Path("/etc/pega-pega/config.yaml")
+        with open(save_path, "w") as f:
+            yaml.dump(self.to_dict(), f, default_flow_style=False, sort_keys=False)
+        return save_path
 
     def get_response_ip(self) -> str:
         if self.response_ip:

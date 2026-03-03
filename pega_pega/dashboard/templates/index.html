@@ -259,6 +259,68 @@ table.req-table tbody tr.new-row {
     overflow: auto;
 }
 
+/* ── Settings panel ───────────────────────────────────────────────── */
+.settings-btn { background:#1a1a3e; color:#00e5ff; border-color:#00e5ff33; font-size:.85rem; }
+.settings-btn:hover { background:#292950; color:#00e5ff; }
+.settings-overlay {
+    display:none; position:fixed; top:0; left:0; right:0; bottom:0;
+    background:rgba(0,0,0,.5); z-index:99;
+}
+.settings-overlay.active { display:block; }
+.settings-panel {
+    position:fixed; top:0; right:-480px; width:460px; max-width:90vw; height:100vh;
+    background:#111127; border-left:1px solid #1a1a3e; z-index:100;
+    overflow-y:auto; transition:right .3s ease; box-shadow:-4px 0 20px rgba(0,0,0,.5);
+}
+.settings-panel.active { right:0; }
+.settings-header {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 20px; border-bottom:1px solid #1a1a3e;
+    position:sticky; top:0; background:#111127; z-index:1;
+}
+.settings-header h2 { color:#00e5ff; font-size:1.1rem; font-weight:600; }
+.settings-body { padding:20px; }
+.settings-section {
+    margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid #1a1a3e;
+}
+.settings-section h3 {
+    color:#8892b0; font-size:.85rem; text-transform:uppercase;
+    letter-spacing:1px; margin-bottom:12px;
+}
+.settings-note { font-size:.78rem; color:#666; margin-bottom:12px; font-style:italic; }
+.settings-field { margin-bottom:12px; }
+.settings-field label {
+    display:block; font-size:.8rem; color:#7ec8e3; margin-bottom:4px; font-weight:600;
+}
+.settings-field input[type="text"],
+.settings-field input[type="number"] {
+    width:100%; background:#1a1a2e; color:#d0d0d0; border:1px solid #333;
+    padding:8px 12px; border-radius:4px; font-size:.85rem; outline:none;
+}
+.settings-field input:focus { border-color:#00e5ff; }
+.settings-actions { margin-bottom:24px; display:flex; align-items:center; gap:12px; }
+.settings-status { font-size:.8rem; color:#888; }
+.settings-status.success { color:#00e676; }
+.settings-status.error { color:#ff1744; }
+.proto-toggle {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 0; border-bottom:1px solid #1a1a2e;
+}
+.proto-toggle-label { font-size:.85rem; color:#d0d0d0; display:flex; align-items:center; gap:8px; }
+.proto-toggle-port { font-size:.75rem; color:#666; }
+.toggle-switch { position:relative; width:40px; height:22px; display:inline-block; }
+.toggle-switch input { opacity:0; width:0; height:0; }
+.toggle-slider {
+    position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
+    background:#333; border-radius:22px; transition:.3s;
+}
+.toggle-slider::before {
+    content:""; position:absolute; height:16px; width:16px; left:3px; bottom:3px;
+    background:#888; border-radius:50%; transition:.3s;
+}
+.toggle-switch input:checked + .toggle-slider { background:#00838f; }
+.toggle-switch input:checked + .toggle-slider::before { transform:translateX(18px); background:#fff; }
+
 /* ── Responsive ───────────────────────────────────────────────────── */
 @media (max-width: 768px) {
     .header { padding: 10px 12px; }
@@ -275,9 +337,12 @@ table.req-table tbody tr.new-row {
         <span class="header-title">PEGA-PEGA</span>
         <span class="header-subtitle">Multi-Protocol Request Logger</span>
     </div>
-    <div class="ws-indicator">
-        <span class="ws-dot" id="wsDot"></span>
-        <span id="wsLabel">Connecting...</span>
+    <div style="display:flex;align-items:center;gap:16px;">
+        <div class="ws-indicator">
+            <span class="ws-dot" id="wsDot"></span>
+            <span id="wsLabel">Connecting...</span>
+        </div>
+        <button class="btn settings-btn" onclick="toggleSettings()" title="Settings">&#9881; Settings</button>
     </div>
 </div>
 
@@ -316,6 +381,54 @@ table.req-table tbody tr.new-row {
         <button class="btn" id="btnPrev" onclick="prevPage()" disabled>&laquo; Prev</button>
         <span id="pageInfo" style="font-size:.8rem; color:#666;">Page 1</span>
         <button class="btn" id="btnNext" onclick="nextPage()">Next &raquo;</button>
+    </div>
+</div>
+
+<!-- ── Settings Panel ──────────────────────────────────────────────── -->
+<div class="settings-overlay" id="settingsOverlay" onclick="toggleSettings()"></div>
+<div class="settings-panel" id="settingsPanel">
+    <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="btn" onclick="toggleSettings()">&times; Close</button>
+    </div>
+    <div class="settings-body">
+        <div class="settings-section">
+            <h3>Server Configuration</h3>
+            <p class="settings-note">Changes are saved to the config file. Restart pega-pega for changes to take effect.</p>
+            <div class="settings-field">
+                <label for="cfgDomain">Domain</label>
+                <input type="text" id="cfgDomain" placeholder="pega.local" />
+            </div>
+            <div class="settings-field">
+                <label for="cfgResponseIp">Response IP</label>
+                <input type="text" id="cfgResponseIp" placeholder="auto-detect" />
+            </div>
+            <div class="settings-field">
+                <label for="cfgBindIp">Bind IP</label>
+                <input type="text" id="cfgBindIp" placeholder="0.0.0.0" />
+            </div>
+            <div class="settings-field">
+                <label for="cfgDashboardPort">Dashboard Port</label>
+                <input type="number" id="cfgDashboardPort" placeholder="8443" />
+            </div>
+        </div>
+        <div class="settings-section">
+            <h3>Protocols</h3>
+            <div id="protocolToggles"></div>
+        </div>
+        <div class="settings-actions">
+            <button class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
+            <span id="saveStatus" class="settings-status"></span>
+        </div>
+        <div class="settings-section">
+            <h3>Software Update</h3>
+            <div class="settings-field">
+                <label>Current Version</label>
+                <span id="currentVersion" style="font-family:monospace;color:#d0d0d0;">loading...</span>
+            </div>
+            <button class="btn btn-primary" id="btnUpdate" onclick="triggerUpdate()">Check for Updates</button>
+            <div id="updateStatus" class="settings-status" style="margin-top:8px;"></div>
+        </div>
     </div>
 </div>
 
@@ -746,6 +859,125 @@ function connectWS() {
             console.error('WS message parse error', e);
         }
     };
+}
+
+/* ── Settings Panel ──────────────────────────────────────────────── */
+let settingsLoaded = false;
+
+function toggleSettings() {
+    const panel = document.getElementById('settingsPanel');
+    const overlay = document.getElementById('settingsOverlay');
+    const isActive = panel.classList.contains('active');
+    if (isActive) {
+        panel.classList.remove('active');
+        overlay.classList.remove('active');
+    } else {
+        panel.classList.add('active');
+        overlay.classList.add('active');
+        if (!settingsLoaded) loadConfig();
+    }
+}
+
+async function loadConfig() {
+    try {
+        const resp = await fetch('/api/config');
+        if (!resp.ok) return;
+        const cfg = await resp.json();
+        document.getElementById('cfgDomain').value = cfg.domain || '';
+        document.getElementById('cfgResponseIp').value = cfg.response_ip || '';
+        document.getElementById('cfgBindIp').value = cfg.bind_ip || '';
+        document.getElementById('cfgDashboardPort').value = cfg.dashboard_port || '';
+
+        const container = document.getElementById('protocolToggles');
+        container.innerHTML = '';
+        for (const [name, proto] of Object.entries(cfg.protocols || {})) {
+            const upper = name.toUpperCase();
+            const c = PROTO_COLORS[upper] || { bg:'#333', fg:'#aaa' };
+            const row = document.createElement('div');
+            row.className = 'proto-toggle';
+            row.innerHTML = `
+                <div class="proto-toggle-label">
+                    <span class="proto-badge" style="background:${c.bg};color:${c.fg};min-width:70px;">${escapeHtml(upper)}</span>
+                    <span class="proto-toggle-port">:${proto.port}</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" data-proto="${escapeHtml(name)}" ${proto.enabled ? 'checked' : ''} />
+                    <span class="toggle-slider"></span>
+                </label>`;
+            container.appendChild(row);
+        }
+
+        document.getElementById('currentVersion').textContent = 'v' + (cfg._version || '?');
+        settingsLoaded = true;
+    } catch (e) { console.error('Config load error', e); }
+}
+
+async function saveConfig() {
+    const statusEl = document.getElementById('saveStatus');
+    statusEl.textContent = 'Saving...';
+    statusEl.className = 'settings-status';
+
+    const config = {
+        domain: document.getElementById('cfgDomain').value,
+        response_ip: document.getElementById('cfgResponseIp').value,
+        bind_ip: document.getElementById('cfgBindIp').value,
+        dashboard_port: parseInt(document.getElementById('cfgDashboardPort').value) || 8443,
+        protocols: {},
+    };
+    document.querySelectorAll('#protocolToggles input[type="checkbox"]').forEach(cb => {
+        config.protocols[cb.dataset.proto] = { enabled: cb.checked };
+    });
+
+    try {
+        const resp = await fetch('/api/config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            statusEl.textContent = data.message || 'Saved!';
+            statusEl.className = 'settings-status success';
+        } else {
+            statusEl.textContent = data.error || 'Save failed';
+            statusEl.className = 'settings-status error';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Network error';
+        statusEl.className = 'settings-status error';
+    }
+    setTimeout(() => { statusEl.textContent = ''; }, 5000);
+}
+
+async function triggerUpdate() {
+    const btn = document.getElementById('btnUpdate');
+    const statusEl = document.getElementById('updateStatus');
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+    statusEl.textContent = 'Checking for updates...';
+    statusEl.className = 'settings-status';
+
+    try {
+        const resp = await fetch('/api/update', { method: 'POST' });
+        const data = await resp.json();
+        if (resp.ok) {
+            statusEl.textContent = data.message;
+            statusEl.className = 'settings-status success';
+            if (data.restarted) {
+                statusEl.textContent += ' — reloading...';
+                setTimeout(() => { window.location.reload(); }, 5000);
+            }
+        } else {
+            statusEl.textContent = data.error || 'Update failed';
+            statusEl.className = 'settings-status error';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Network error — service may be restarting';
+        statusEl.className = 'settings-status error';
+        setTimeout(() => { window.location.reload(); }, 5000);
+    }
+    btn.disabled = false;
+    btn.textContent = 'Check for Updates';
 }
 
 /* ── Initial load ────────────────────────────────────────────────── */

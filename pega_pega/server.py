@@ -77,7 +77,7 @@ class PegaPegaServer:
 
         # Start web dashboard
         if not self.config.no_dashboard:
-            app = create_app(self.store, self.bus)
+            app = create_app(self.store, self.bus, self.config)
             dashboard_config = uvicorn.Config(
                 app,
                 host=self.config.dashboard_host,

@@ -19,6 +19,9 @@ dependencies = [
 [project.scripts]
 pega-pega = "pega_pega.cli:main"
 
+[tool.setuptools.packages.find]
+include = ["pega_pega*"]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
