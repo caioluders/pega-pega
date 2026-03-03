@@ -39,16 +39,21 @@ class MockMatcher:
     def _path_to_regex(path: str) -> re.Pattern:
         """Convert a path pattern to a compiled regex.
 
-        Supports :param segments (e.g. /api/users/:id → /api/users/[^/]+)
-        and * wildcard at the end (e.g. /api/* → /api/.*)
+        Supports:
+          :param  — single segment  (/api/users/:id → /api/users/[^/]+)
+          *       — match everything after this point (/api/* → /api/.*)
+          **      — same as * (catch-all)
+        The * wildcard can appear anywhere and captures all remaining path.
         """
         parts = path.rstrip("/").split("/")
         regex_parts = []
         for part in parts:
             if part.startswith(":"):
                 regex_parts.append("[^/]+")
-            elif part == "*":
+            elif part in ("*", "**"):
+                # Catch-all: match everything from here
                 regex_parts.append(".*")
+                break
             else:
                 regex_parts.append(re.escape(part))
         regex = "/".join(regex_parts)
