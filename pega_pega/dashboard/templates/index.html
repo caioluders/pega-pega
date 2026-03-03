@@ -322,7 +322,11 @@ table.req-table tbody tr.new-row {
 .toggle-switch input:checked + .toggle-slider::before { transform:translateX(18px); background:#fff; }
 
 /* ── Action menu ──────────────────────────────────────────────────── */
-.action-cell { position: relative; }
+.action-cell {
+    overflow: visible !important;
+    position: relative;
+    text-overflow: clip !important;
+}
 .action-btn {
     background: #1a1a3e;
     color: #8892b0;
@@ -336,14 +340,12 @@ table.req-table tbody tr.new-row {
 .action-btn:hover { background: #292950; color: #fff; }
 .action-menu {
     display: none;
-    position: absolute;
-    right: 0;
-    top: 100%;
+    position: fixed;
     background: #1a1a2e;
     border: 1px solid #333;
     border-radius: 6px;
     min-width: 150px;
-    z-index: 50;
+    z-index: 1000;
     box-shadow: 0 4px 16px rgba(0,0,0,.5);
     overflow: hidden;
 }
@@ -1296,11 +1298,21 @@ async function requestLeCert() {
 
 /* ── Action menu ─────────────────────────────────────────────────── */
 function toggleActionMenu(btn) {
+    const menu = btn.nextElementSibling;
     /* Close any other open menus */
     document.querySelectorAll('.action-menu.open').forEach(m => {
-        if (m !== btn.nextElementSibling) m.classList.remove('open');
+        if (m !== menu) m.classList.remove('open');
     });
-    btn.nextElementSibling.classList.toggle('open');
+    if (menu.classList.contains('open')) {
+        menu.classList.remove('open');
+        return;
+    }
+    /* Position using fixed coords so it's never clipped */
+    const rect = btn.getBoundingClientRect();
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.right = (window.innerWidth - rect.right) + 'px';
+    menu.style.left = 'auto';
+    menu.classList.add('open');
 }
 /* Close menus on click outside */
 document.addEventListener('click', () => {
