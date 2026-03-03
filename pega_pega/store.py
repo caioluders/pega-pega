@@ -257,7 +257,10 @@ class Store:
 
     def _insert_mock_rule(self, rule: MockRule):
         self._conn.execute(
-            "INSERT OR REPLACE INTO mock_rules VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            """INSERT OR REPLACE INTO mock_rules
+               (id, path, method, status_code, response_body, content_type,
+                headers, enabled, priority, response_file, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 rule.id,
                 rule.path,
