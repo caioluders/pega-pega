@@ -5,12 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 import secrets
+import uuid
 from pathlib import Path
 from typing import Optional
 
 import yaml
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect, Query
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -393,6 +394,10 @@ def create_app(
 
     # ── Mock rules API ──────────────────────────────────────────────
 
+    # Uploads directory (next to the database)
+    _uploads_dir = Path(config.db_path).resolve().parent / "uploads" if config else Path("uploads")
+    _uploads_dir.mkdir(parents=True, exist_ok=True)
+
     async def _reload_matcher():
         """Reload mock matcher from database."""
         if mock_matcher is not None:
@@ -424,6 +429,7 @@ def create_app(
             headers=body.get("headers", {}),
             enabled=body.get("enabled", True),
             priority=int(body.get("priority", 0)),
+            response_file=body.get("response_file", ""),
         )
         await store.save_mock_rule(rule)
         await _reload_matcher()
@@ -450,6 +456,7 @@ def create_app(
             headers=body.get("headers", existing["headers"]),
             enabled=body.get("enabled", existing["enabled"]),
             priority=int(body.get("priority", existing["priority"])),
+            response_file=body.get("response_file", existing.get("response_file", "")),
             created_at=existing["created_at"],
         )
         await store.save_mock_rule(rule)
@@ -489,12 +496,37 @@ def create_app(
                     headers=existing["headers"],
                     enabled=existing["enabled"],
                     priority=i,
+                    response_file=existing.get("response_file", ""),
                     created_at=existing["created_at"],
                 )
                 await store.save_mock_rule(rule)
 
         await _reload_matcher()
         return {"status": "ok"}
+
+    @app.post("/api/mock-rules/upload")
+    async def upload_mock_file(file: UploadFile):
+        if not file.filename:
+            return JSONResponse({"error": "No file provided"}, status_code=400)
+        # Limit to 10 MB
+        contents = await file.read()
+        if len(contents) > 10 * 1024 * 1024:
+            return JSONResponse({"error": "File too large (max 10MB)"}, status_code=400)
+        # Save with unique name to avoid collisions
+        ext = Path(file.filename).suffix
+        safe_name = f"{uuid.uuid4().hex}{ext}"
+        dest = _uploads_dir / safe_name
+        dest.write_bytes(contents)
+        return {"filename": safe_name, "original_name": file.filename, "size": len(contents)}
+
+    @app.get("/api/mock-rules/uploads/{filename}")
+    async def serve_upload(filename: str):
+        # Sanitize: only allow simple filenames (no path traversal)
+        safe = Path(filename).name
+        filepath = _uploads_dir / safe
+        if not filepath.is_file():
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        return FileResponse(filepath)
 
     # ── WebSocket (live feed) ────────────────────────────────────────
 

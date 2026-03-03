@@ -369,8 +369,23 @@ class HttpHandler(BaseProtocolHandler):
             503: "Service Unavailable",
         }
         reason = reasons.get(status_code, "OK")
-        body = rule.get("response_body", "").encode("utf-8")
         content_type = rule.get("content_type", "application/json")
+
+        # Serve uploaded file if set, otherwise use response_body text
+        response_file = rule.get("response_file", "")
+        if response_file:
+            from pathlib import Path
+            uploads_dir = getattr(HttpHandler, '_uploads_dir', None)
+            if uploads_dir:
+                filepath = Path(uploads_dir) / Path(response_file).name
+                if filepath.is_file():
+                    body = filepath.read_bytes()
+                else:
+                    body = rule.get("response_body", "").encode("utf-8")
+            else:
+                body = rule.get("response_body", "").encode("utf-8")
+        else:
+            body = rule.get("response_body", "").encode("utf-8")
 
         header_lines = [
             f"{version} {status_code} {reason}\r\n",

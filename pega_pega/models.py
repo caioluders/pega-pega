@@ -57,6 +57,7 @@ class MockRule:
     headers: dict = field(default_factory=dict)
     enabled: bool = True
     priority: int = 0
+    response_file: str = ""
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict:
@@ -70,5 +71,6 @@ class MockRule:
             "headers": self.headers,
             "enabled": self.enabled,
             "priority": self.priority,
+            "response_file": self.response_file,
             "created_at": self.created_at,
         }

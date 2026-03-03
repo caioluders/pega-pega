@@ -229,6 +229,7 @@ input:checked + .toggle-slider::before { transform: translateX(16px); background
 }
 .status-msg.error { color: #e74c3c; }
 .status-msg.success { color: #4caf50; }
+.file-active { color: #4caf50; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -288,12 +289,25 @@ input:checked + .toggle-slider::before { transform: translateX(16px); background
                     <option value="text/html">text/html</option>
                     <option value="text/plain">text/plain</option>
                     <option value="application/xml">application/xml</option>
+                    <option value="image/png">image/png</option>
+                    <option value="image/jpeg">image/jpeg</option>
+                    <option value="image/gif">image/gif</option>
+                    <option value="image/svg+xml">image/svg+xml</option>
+                    <option value="application/pdf">application/pdf</option>
+                    <option value="application/octet-stream">application/octet-stream</option>
                 </select>
             </div>
         </div>
         <div class="form-field">
             <label for="fBody">Response Body</label>
             <textarea id="fBody" placeholder='{"message": "Hello from mock!"}'></textarea>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+                <button class="btn btn-sm" type="button" onclick="document.getElementById('fileUpload').click()">Upload File</button>
+                <input type="file" id="fileUpload" style="display:none" onchange="handleFileUpload(this)" />
+                <span id="fileInfo" style="font-size:.75rem;color:#666;"></span>
+                <button class="btn btn-sm btn-danger" id="btnClearFile" type="button" onclick="clearUploadedFile()" style="display:none;">Remove</button>
+            </div>
+            <input type="hidden" id="fResponseFile" value="" />
         </div>
         <div class="form-field">
             <label>Response Headers <button class="btn btn-sm" type="button" onclick="addHeaderRow()">+ Add</button></label>
@@ -351,6 +365,7 @@ function renderRules() {
                 <span class="method-badge method-${r.method}">${esc(r.method)}</span>
                 <span class="rule-path">${esc(r.path)}</span>
                 <span class="status-badge ${statusClass(r.status_code)}">${r.status_code}</span>
+                ${r.response_file ? '<span style="font-size:.7rem;color:#888;" title="File attached">&#128206;</span>' : ''}
             </div>
             <div class="rule-actions">
                 <label class="toggle-switch" title="Enable/Disable">
@@ -429,6 +444,14 @@ function openModal(rule) {
         document.getElementById('fStatus').value = rule.status_code;
         document.getElementById('fContentType').value = rule.content_type;
         document.getElementById('fBody').value = rule.response_body;
+        document.getElementById('fResponseFile').value = rule.response_file || '';
+        if (rule.response_file) {
+            document.getElementById('fileInfo').innerHTML = `<span class="file-active">${esc(rule.response_file)}</span>`;
+            document.getElementById('btnClearFile').style.display = '';
+        } else {
+            document.getElementById('fileInfo').textContent = '';
+            document.getElementById('btnClearFile').style.display = 'none';
+        }
         const hl = document.getElementById('headersList');
         hl.innerHTML = '';
         for (const [k, v] of Object.entries(rule.headers || {})) {
@@ -442,6 +465,9 @@ function openModal(rule) {
         document.getElementById('fStatus').value = '200';
         document.getElementById('fContentType').value = 'application/json';
         document.getElementById('fBody').value = '';
+        document.getElementById('fResponseFile').value = '';
+        document.getElementById('fileInfo').textContent = '';
+        document.getElementById('btnClearFile').style.display = 'none';
         document.getElementById('headersList').innerHTML = '';
     }
     document.getElementById('modalOverlay').classList.add('show');
@@ -468,6 +494,45 @@ function addHeaderRow(key, value) {
     hl.appendChild(row);
 }
 
+/* ── File upload ─────────────────────────────────────────────────── */
+async function handleFileUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const infoEl = document.getElementById('fileInfo');
+    infoEl.textContent = 'Uploading...';
+
+    try {
+        const resp = await fetch('/api/mock-rules/upload', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (resp.ok) {
+            document.getElementById('fResponseFile').value = data.filename;
+            infoEl.innerHTML = `<span class="file-active">${esc(data.original_name)}</span> (${(data.size / 1024).toFixed(1)} KB)`;
+            document.getElementById('btnClearFile').style.display = '';
+            // Auto-detect content type from extension
+            const ext = file.name.split('.').pop().toLowerCase();
+            const mimeMap = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', svg:'image/svg+xml', pdf:'application/pdf'};
+            if (mimeMap[ext]) {
+                document.getElementById('fContentType').value = mimeMap[ext];
+            }
+        } else {
+            infoEl.textContent = data.error || 'Upload failed';
+        }
+    } catch (e) {
+        infoEl.textContent = 'Upload error';
+    }
+    input.value = '';
+}
+
+function clearUploadedFile() {
+    document.getElementById('fResponseFile').value = '';
+    document.getElementById('fileInfo').textContent = '';
+    document.getElementById('btnClearFile').style.display = 'none';
+    document.getElementById('fileUpload').value = '';
+}
+
 async function saveRule() {
     const statusEl = document.getElementById('formStatus');
     const editId = document.getElementById('editId').value;
@@ -492,6 +557,7 @@ async function saveRule() {
         status_code: parseInt(document.getElementById('fStatus').value) || 200,
         content_type: document.getElementById('fContentType').value,
         response_body: document.getElementById('fBody').value,
+        response_file: document.getElementById('fResponseFile').value,
         headers,
         priority: editId ? (rules.find(r => r.id === editId)?.priority || 0) : rules.length,
     };

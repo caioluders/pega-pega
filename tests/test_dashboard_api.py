@@ -369,3 +369,55 @@ async def test_blocked_ip_hides_requests(client, store):
     data = resp.json()
     assert data["total"] == 1
     assert data["requests"][0]["source_ip"] == "10.0.0.2"
+
+
+# ── File upload tests ────────────────────────────────────────────
+
+
+async def test_upload_file(client):
+    content = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    resp = await client.post(
+        "/api/mock-rules/upload",
+        files={"file": ("test.png", content, "image/png")},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["original_name"] == "test.png"
+    assert data["size"] == len(content)
+    assert data["filename"].endswith(".png")
+
+
+async def test_serve_uploaded_file(client):
+    content = b"hello world"
+    upload_resp = await client.post(
+        "/api/mock-rules/upload",
+        files={"file": ("test.txt", content, "text/plain")},
+    )
+    filename = upload_resp.json()["filename"]
+    resp = await client.get(f"/api/mock-rules/uploads/{filename}")
+    assert resp.status_code == 200
+    assert resp.content == content
+
+
+async def test_serve_upload_not_found(client):
+    resp = await client.get("/api/mock-rules/uploads/nonexistent.txt")
+    assert resp.status_code == 404
+
+
+async def test_mock_rule_with_response_file(client):
+    content = b'{"uploaded": true}'
+    upload_resp = await client.post(
+        "/api/mock-rules/upload",
+        files={"file": ("data.json", content, "application/json")},
+    )
+    filename = upload_resp.json()["filename"]
+
+    resp = await client.post("/api/mock-rules", json={
+        "path": "/api/file-test",
+        "method": "GET",
+        "status_code": 200,
+        "content_type": "application/json",
+        "response_file": filename,
+    })
+    assert resp.status_code == 200
+    assert resp.json()["response_file"] == filename

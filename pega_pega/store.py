@@ -61,9 +61,17 @@ class Store:
                 headers TEXT NOT NULL DEFAULT '{}',
                 enabled INTEGER NOT NULL DEFAULT 1,
                 priority INTEGER NOT NULL DEFAULT 0,
+                response_file TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL
             )
         """)
+        # Migration: add response_file column if missing
+        try:
+            self._conn.execute("SELECT response_file FROM mock_rules LIMIT 0")
+        except Exception:
+            self._conn.execute(
+                "ALTER TABLE mock_rules ADD COLUMN response_file TEXT NOT NULL DEFAULT ''"
+            )
         self._conn.commit()
 
     async def save(self, req: CapturedRequest):
@@ -249,7 +257,7 @@ class Store:
 
     def _insert_mock_rule(self, rule: MockRule):
         self._conn.execute(
-            "INSERT OR REPLACE INTO mock_rules VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO mock_rules VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
                 rule.id,
                 rule.path,
@@ -260,6 +268,7 @@ class Store:
                 json.dumps(rule.headers, default=str),
                 1 if rule.enabled else 0,
                 rule.priority,
+                rule.response_file,
                 rule.created_at,
             ),
         )
