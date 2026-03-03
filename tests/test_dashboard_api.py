@@ -1,8 +1,10 @@
 import subprocess
 
 import httpx
+import pytest
 import pytest_asyncio
 
+from pega_pega.config import Config
 from pega_pega.dashboard.app import create_app
 from pega_pega.models import CapturedRequest, Protocol
 
@@ -10,6 +12,27 @@ from pega_pega.models import CapturedRequest, Protocol
 @pytest_asyncio.fixture
 async def client(store, event_bus, custom_config):
     app = create_app(store, event_bus, custom_config)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+@pytest_asyncio.fixture
+async def auth_config(tmp_path):
+    cfg = Config(
+        domain="test.example.com",
+        response_ip="10.0.0.1",
+        dashboard_port=9999,
+        dashboard_password="s3cret",
+        db_path=str(tmp_path / "test.db"),
+    )
+    cfg._source_path = tmp_path / "config.yaml"
+    return cfg
+
+
+@pytest_asyncio.fixture
+async def auth_client(store, event_bus, auth_config):
+    app = create_app(store, event_bus, auth_config)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
@@ -111,3 +134,88 @@ async def test_letsencrypt_status(client, monkeypatch):
     data = resp.json()
     assert data["certbot_available"] is False
     assert data["certificate_exists"] is False
+
+
+async def test_get_config_hides_password(client):
+    resp = await client.get("/api/config")
+    data = resp.json()
+    assert "dashboard_password" not in data
+    assert "password_set" in data
+
+
+# ── Auth tests ────────────────────────────────────────────────────────
+
+
+async def test_no_password_no_auth_required(client):
+    """When dashboard_password is empty, all routes are open."""
+    resp = await client.get("/api/requests")
+    assert resp.status_code == 200
+
+
+async def test_auth_api_returns_401(auth_client):
+    """When password is set, API calls without session get 401."""
+    resp = await auth_client.get("/api/requests")
+    assert resp.status_code == 401
+
+
+async def test_auth_index_redirects_to_login(auth_client):
+    """When password is set, GET / redirects to /login."""
+    resp = await auth_client.get("/", follow_redirects=False)
+    assert resp.status_code == 302
+    assert "/login" in resp.headers["location"]
+
+
+async def test_login_page_accessible(auth_client):
+    """Login page is always accessible even without auth."""
+    resp = await auth_client.get("/login")
+    assert resp.status_code == 200
+    assert "PEGA-PEGA" in resp.text
+
+
+async def test_login_wrong_password(auth_client):
+    resp = await auth_client.post(
+        "/api/auth/login", json={"password": "wrong"}
+    )
+    assert resp.status_code == 401
+
+
+async def test_login_correct_password(auth_client):
+    resp = await auth_client.post(
+        "/api/auth/login", json={"password": "s3cret"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+    assert "session" in resp.cookies
+
+
+async def test_authenticated_request(auth_client):
+    """After login, API routes should work with the session cookie."""
+    login_resp = await auth_client.post(
+        "/api/auth/login", json={"password": "s3cret"}
+    )
+    session_cookie = login_resp.cookies["session"]
+
+    resp = await auth_client.get(
+        "/api/requests",
+        cookies={"session": session_cookie},
+    )
+    assert resp.status_code == 200
+
+
+async def test_logout_clears_session(auth_client):
+    """After logout, session cookie is invalid."""
+    login_resp = await auth_client.post(
+        "/api/auth/login", json={"password": "s3cret"}
+    )
+    session_cookie = login_resp.cookies["session"]
+
+    await auth_client.post(
+        "/api/auth/logout",
+        cookies={"session": session_cookie},
+    )
+
+    resp = await auth_client.get(
+        "/api/requests",
+        cookies={"session": session_cookie},
+    )
+    assert resp.status_code == 401

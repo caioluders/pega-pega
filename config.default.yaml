@@ -2,6 +2,7 @@ bind_ip: "0.0.0.0"
 domain: "pega.local"
 response_ip: ""  # auto-detect; set to your server's public IP
 dashboard_port: 8443
+dashboard_password: ""  # empty = no auth; set a password to protect the dashboard
 db_path: "pega_pega.db"
 
 letsencrypt:

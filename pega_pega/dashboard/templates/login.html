@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PEGA-PEGA Login</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d0d1a;
+    color: #d0d0d0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.login-box {
+    background: #12122a;
+    border: 1px solid #1a1a3e;
+    border-radius: 12px;
+    padding: 40px;
+    width: 360px;
+    text-align: center;
+}
+.login-box h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #7ec8e3;
+    margin-bottom: 8px;
+}
+.login-box p {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 24px;
+}
+.login-box input[type="password"] {
+    width: 100%;
+    padding: 10px 14px;
+    background: #0d0d1a;
+    border: 1px solid #2a2a4a;
+    border-radius: 6px;
+    color: #d0d0d0;
+    font-size: 0.95rem;
+    outline: none;
+    margin-bottom: 16px;
+}
+.login-box input[type="password"]:focus {
+    border-color: #7ec8e3;
+}
+.login-box button {
+    width: 100%;
+    padding: 10px;
+    background: #1a3a5c;
+    border: 1px solid #2a4a7c;
+    border-radius: 6px;
+    color: #7ec8e3;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.login-box button:hover {
+    background: #224a6c;
+}
+.error {
+    color: #e74c3c;
+    font-size: 0.85rem;
+    margin-top: 12px;
+    display: none;
+}
+</style>
+</head>
+<body>
+<div class="login-box">
+    <h1>PEGA-PEGA</h1>
+    <p>Enter password to access the dashboard</p>
+    <form id="loginForm" onsubmit="return doLogin(event)">
+        <input type="password" id="password" placeholder="Password" autofocus>
+        <button type="submit">Login</button>
+    </form>
+    <div class="error" id="error">Wrong password</div>
+</div>
+<script>
+async function doLogin(e) {
+    e.preventDefault();
+    const pw = document.getElementById('password').value;
+    const errEl = document.getElementById('error');
+    errEl.style.display = 'none';
+    try {
+        const resp = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: pw}),
+        });
+        if (resp.ok) {
+            window.location.href = '/';
+        } else {
+            const data = await resp.json();
+            errEl.textContent = data.error || 'Wrong password';
+            errEl.style.display = 'block';
+        }
+    } catch {
+        errEl.textContent = 'Connection error';
+        errEl.style.display = 'block';
+    }
+    return false;
+}
+</script>
+</body>
+</html>

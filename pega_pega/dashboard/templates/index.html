@@ -343,6 +343,7 @@ table.req-table tbody tr.new-row {
             <span id="wsLabel">Connecting...</span>
         </div>
         <button class="btn settings-btn" onclick="toggleSettings()" title="Settings">&#9881; Settings</button>
+        <button class="btn" id="logoutBtn" onclick="doLogout()" title="Logout" style="display:none;">&#x2190; Logout</button>
     </div>
 </div>
 
@@ -949,6 +950,11 @@ async function loadConfig() {
         /* Load LE cert status */
         loadLeStatus();
 
+        /* Show logout button if password is set */
+        if (cfg.password_set) {
+            document.getElementById('logoutBtn').style.display = '';
+        }
+
         settingsLoaded = true;
     } catch (e) { console.error('Config load error', e); }
 }
@@ -1113,6 +1119,12 @@ async function requestLeCert() {
     }
     btn.disabled = false;
     btn.textContent = 'Request Certificate';
+}
+
+/* ── Logout ──────────────────────────────────────────────────────── */
+async function doLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
 }
 
 /* ── Initial load ────────────────────────────────────────────────── */

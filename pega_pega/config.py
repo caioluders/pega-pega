@@ -29,6 +29,7 @@ class Config:
     dashboard_host: str = "0.0.0.0"
     db_path: str = "pega_pega.db"
     no_dashboard: bool = False
+    dashboard_password: str = ""
     letsencrypt: LetsEncryptConfig = field(default_factory=LetsEncryptConfig)
     protocols: dict[str, ProtocolConfig] = field(default_factory=dict)
     _source_path: Path | None = field(default=None, init=False, repr=False, compare=False)
@@ -120,6 +121,7 @@ class Config:
             dashboard_port=raw.get("dashboard_port", 8443),
             dashboard_host=raw.get("dashboard_host", "0.0.0.0"),
             db_path=raw.get("db_path", "pega_pega.db"),
+            dashboard_password=raw.get("dashboard_password", ""),
             letsencrypt=le_config,
             protocols=protocols,
         )
@@ -134,6 +136,7 @@ class Config:
             "dashboard_port": self.dashboard_port,
             "dashboard_host": self.dashboard_host,
             "db_path": self.db_path,
+            "dashboard_password": self.dashboard_password,
             "letsencrypt": {
                 "enabled": self.letsencrypt.enabled,
                 "email": self.letsencrypt.email,

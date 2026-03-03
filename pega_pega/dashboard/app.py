@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import secrets
 from pathlib import Path
 from typing import Optional
 
 import yaml
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from .. import __version__
@@ -37,9 +39,79 @@ def create_app(store: Store, bus: EventBus, config: Config | None = None) -> Fas
 
     templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
+    # ── Session store ────────────────────────────────────────────────
+    _sessions: set[str] = set()
+
+    def _password_required() -> bool:
+        return bool(config and config.dashboard_password)
+
+    def _is_authenticated(request: Request) -> bool:
+        token = request.cookies.get("session")
+        return token is not None and token in _sessions
+
+    # ── Auth middleware ───────────────────────────────────────────────
+    _PUBLIC_PATHS = {"/login", "/api/auth/login"}
+    _PUBLIC_PREFIXES = ("/static/",)
+
+    class AuthMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            if not _password_required():
+                return await call_next(request)
+
+            path = request.url.path
+            if path in _PUBLIC_PATHS or any(path.startswith(p) for p in _PUBLIC_PREFIXES):
+                return await call_next(request)
+
+            if _is_authenticated(request):
+                return await call_next(request)
+
+            # API calls get 401; browsers get redirected to /login
+            if path.startswith("/api/") or path == "/ws":
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            return RedirectResponse("/login", status_code=302)
+
+    app.add_middleware(AuthMiddleware)
+
     # Mount static assets ─────────────────────────────────────────────
     if _STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+    # ── Auth endpoints ───────────────────────────────────────────────
+
+    @app.get("/login", response_class=HTMLResponse)
+    async def login_page(request: Request):
+        if not _password_required():
+            return RedirectResponse("/", status_code=302)
+        return templates.TemplateResponse("login.html", {"request": request})
+
+    @app.post("/api/auth/login")
+    async def auth_login(request: Request):
+        if not _password_required():
+            return {"status": "ok"}
+
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+        password = body.get("password", "")
+        if password == config.dashboard_password:
+            token = secrets.token_urlsafe(32)
+            _sessions.add(token)
+            resp = JSONResponse({"status": "ok"})
+            resp.set_cookie("session", token, httponly=True, samesite="lax")
+            return resp
+
+        return JSONResponse({"error": "Wrong password"}, status_code=401)
+
+    @app.post("/api/auth/logout")
+    async def auth_logout(request: Request):
+        token = request.cookies.get("session")
+        if token:
+            _sessions.discard(token)
+        resp = JSONResponse({"status": "ok"})
+        resp.delete_cookie("session")
+        return resp
 
     # ── HTML ─────────────────────────────────────────────────────────
 
@@ -98,6 +170,9 @@ def create_app(store: Store, bus: EventBus, config: Config | None = None) -> Fas
         if config is None:
             return JSONResponse({"error": "Config not available"}, status_code=503)
         data = config.to_dict()
+        # Don't leak the actual password — just indicate if one is set
+        data.pop("dashboard_password", None)
+        data["password_set"] = _password_required()
         data["_version"] = __version__
         data["_source_path"] = str(config._source_path) if config._source_path else None
         return data
@@ -123,6 +198,9 @@ def create_app(store: Store, bus: EventBus, config: Config | None = None) -> Fas
                 save_data["dashboard_port"] = int(body["dashboard_port"])
             except (ValueError, TypeError):
                 pass
+
+        if "dashboard_password" in body and isinstance(body["dashboard_password"], str):
+            save_data["dashboard_password"] = body["dashboard_password"]
 
         if "letsencrypt" in body and isinstance(body["letsencrypt"], dict):
             le = body["letsencrypt"]
@@ -273,6 +351,11 @@ def create_app(store: Store, bus: EventBus, config: Config | None = None) -> Fas
 
     @app.websocket("/ws")
     async def websocket_endpoint(ws: WebSocket):
+        if _password_required():
+            token = ws.cookies.get("session")
+            if not token or token not in _sessions:
+                await ws.close(code=4001)
+                return
         await ws.accept()
         queue = bus.subscribe()
         try:

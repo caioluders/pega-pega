@@ -12,6 +12,7 @@
 #   --dashboard PORT   Web dashboard port (default: 8443)
 #   --letsencrypt      Install certbot and enable Let's Encrypt SSL
 #   --email EMAIL      Email for Let's Encrypt registration
+#   --password PASS    Set dashboard password (empty = no auth)
 #   --no-service       Install only, don't create systemd service
 #   --update           Update existing installation from GitHub
 #   --uninstall        Remove pega-pega completely
@@ -41,6 +42,7 @@ DASHBOARD_PORT=""
 NO_SERVICE=false
 UNINSTALL=false
 UPDATE=false
+DASHBOARD_PASSWORD=""
 LETSENCRYPT=false
 LE_EMAIL=""
 
@@ -53,6 +55,7 @@ while [[ $# -gt 0 ]]; do
         --no-service)   NO_SERVICE=true; shift ;;
         --update)       UPDATE=true; shift ;;
         --uninstall)    UNINSTALL=true; shift ;;
+        --password)     DASHBOARD_PASSWORD="$2"; shift 2 ;;
         --letsencrypt)  LETSENCRYPT=true; shift ;;
         --email|-e)     LE_EMAIL="$2"; shift 2 ;;
         --help|-h)
@@ -230,6 +233,9 @@ if [[ ! -f "${CONFIG_DIR}/config.yaml" ]]; then
     fi
     if [[ -n "$DASHBOARD_PORT" ]]; then
         sed -i "s/^dashboard_port:.*/dashboard_port: ${DASHBOARD_PORT}/" "${CONFIG_DIR}/config.yaml"
+    fi
+    if [[ -n "$DASHBOARD_PASSWORD" ]]; then
+        sed -i "s/^dashboard_password:.*/dashboard_password: \"${DASHBOARD_PASSWORD}\"/" "${CONFIG_DIR}/config.yaml"
     fi
 
     ok "Config written to ${CONFIG_DIR}/config.yaml"

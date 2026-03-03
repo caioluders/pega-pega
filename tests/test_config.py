@@ -88,6 +88,24 @@ def test_letsencrypt_from_yaml(tmp_path):
     assert cfg.letsencrypt.email == "a@b.com"
 
 
+def test_dashboard_password_default_empty():
+    cfg = Config()
+    assert cfg.dashboard_password == ""
+
+
+def test_dashboard_password_from_yaml(tmp_path):
+    p = tmp_path / "config.yaml"
+    p.write_text(yaml.dump({"dashboard_password": "secret123"}))
+    cfg = Config.load(p)
+    assert cfg.dashboard_password == "secret123"
+
+
+def test_dashboard_password_in_to_dict():
+    cfg = Config(dashboard_password="mypass")
+    d = cfg.to_dict()
+    assert d["dashboard_password"] == "mypass"
+
+
 def test_get_response_ip_explicit():
     cfg = Config(response_ip="1.2.3.4")
     assert cfg.get_response_ip() == "1.2.3.4"
