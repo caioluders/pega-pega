@@ -404,6 +404,23 @@ async def test_mock_rule_with_file_data(client):
     assert resp.json()["response_file"] == "data.json"
 
 
+async def test_mock_rules_list_with_file_data(client):
+    import base64
+    content = b"\x89PNG\r\n"
+    b64 = base64.b64encode(content).decode()
+
+    await client.post("/api/mock-rules", json={
+        "path": "/api/file-list",
+        "response_file": "image.png",
+        "response_file_data_b64": b64,
+    })
+    resp = await client.get("/api/mock-rules")
+    assert resp.status_code == 200
+    rule = resp.json()["rules"][0]
+    assert rule["response_file"] == "image.png"
+    assert "response_file_data" not in rule
+
+
 async def test_serve_file_from_rule(client, store):
     import base64
     content = b"hello world"

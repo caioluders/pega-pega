@@ -1,6 +1,6 @@
 [project]
 name = "pega-pega"
-version = "0.3.1"
+version = "0.3.2"
 description = "Multi-protocol request logger/catcher - catch and display all incoming requests"
 requires-python = ">=3.11"
 dependencies = [

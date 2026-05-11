@@ -406,6 +406,8 @@ def create_app(
     @app.get("/api/mock-rules")
     async def list_mock_rules():
         rules = await store.list_mock_rules()
+        for rule in rules:
+            rule.pop("response_file_data", None)
         return {"rules": rules}
 
     @app.post("/api/mock-rules")
