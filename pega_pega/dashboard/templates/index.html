@@ -5,1368 +5,524 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PEGA-PEGA Dashboard</title>
 <link rel="stylesheet" href="/static/style.css">
-<style>
-/* ── Reset & base ─────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 14px; }
-body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    background: #0d0d1a;
-    color: #d0d0d0;
-    min-height: 100vh;
-}
-a { color: #7ec8e3; text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-/* ── Header ───────────────────────────────────────────────────────── */
-.header {
-    background: linear-gradient(135deg, #0d0d1a 0%, #16213e 100%);
-    border-bottom: 1px solid #1a1a3e;
-    padding: 12px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-.header-title {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: #00e5ff;
-    letter-spacing: 3px;
-    text-shadow: 0 0 12px rgba(0, 229, 255, .3);
-}
-.header-subtitle {
-    font-size: .75rem;
-    color: #666;
-    margin-left: 8px;
-}
-.ws-indicator {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: .8rem;
-    color: #888;
-}
-.ws-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #555;
-    transition: background .3s;
-}
-.ws-dot.connected { background: #00e676; box-shadow: 0 0 6px #00e676; }
-.ws-dot.disconnected { background: #ff1744; box-shadow: 0 0 6px #ff1744; }
-
-/* ── Stats bar ────────────────────────────────────────────────────── */
-.stats-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 10px 24px;
-    background: #111127;
-    border-bottom: 1px solid #1a1a3e;
-    overflow-x: auto;
-}
-.stat-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: .75rem;
-    font-weight: 600;
-    border: 1px solid transparent;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: opacity .2s, transform .15s;
-}
-.stat-badge:hover { opacity: .85; transform: translateY(-1px); }
-.stat-badge .stat-count {
-    background: rgba(0,0,0,.35);
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-size: .7rem;
-}
-
-/* ── Filter bar ───────────────────────────────────────────────────── */
-.filter-bar {
-    display: flex;
-    gap: 10px;
-    padding: 10px 24px;
-    background: #0f0f22;
-    border-bottom: 1px solid #1a1a3e;
-    flex-wrap: wrap;
-    align-items: center;
-}
-.filter-bar select,
-.filter-bar input {
-    background: #1a1a2e;
-    color: #d0d0d0;
-    border: 1px solid #333;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: .85rem;
-    outline: none;
-}
-.filter-bar select:focus,
-.filter-bar input:focus { border-color: #00e5ff; }
-.filter-bar input { flex: 1; min-width: 180px; }
-.btn {
-    background: #1a1a3e;
-    color: #aaa;
-    border: 1px solid #333;
-    padding: 6px 14px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: .85rem;
-    transition: background .2s, color .2s;
-}
-.btn:hover { background: #292950; color: #fff; }
-.btn-primary { background: #00838f; color: #fff; border-color: #00838f; }
-.btn-primary:hover { background: #00acc1; }
-
-/* ── Main table ───────────────────────────────────────────────────── */
-.table-wrap {
-    padding: 0 24px 24px;
-    overflow-x: auto;
-}
-table.req-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 12px;
-    font-size: .85rem;
-}
-table.req-table thead th {
-    background: #16213e;
-    color: #8892b0;
-    padding: 8px 12px;
-    text-align: left;
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: .75rem;
-    letter-spacing: .5px;
-    border-bottom: 2px solid #1a1a3e;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-}
-table.req-table tbody tr {
-    border-bottom: 1px solid #1a1a2e;
-    cursor: pointer;
-    transition: background .15s;
-}
-table.req-table tbody tr:hover { background: #16213e; }
-table.req-table tbody td {
-    padding: 7px 12px;
-    vertical-align: top;
-    max-width: 300px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* New row highlight animation */
-@keyframes rowFlash {
-    0%   { background: rgba(0, 229, 255, .18); }
-    100% { background: transparent; }
-}
-table.req-table tbody tr.new-row {
-    animation: rowFlash 1.5s ease-out;
-}
-
-/* Protocol badge (inline) */
-.proto-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-weight: 700;
-    font-size: .75rem;
-    letter-spacing: .5px;
-    text-align: center;
-    min-width: 60px;
-}
-
-/* ── Detail panel ─────────────────────────────────────────────────── */
-.detail-row td {
-    background: #111127 !important;
-    padding: 16px 24px !important;
-    white-space: normal !important;
-    max-width: none !important;
-    cursor: default !important;
-}
-.detail-row:hover { background: none !important; }
-.detail-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 16px;
-}
-.detail-section {
-    background: #0d0d1a;
-    border: 1px solid #1a1a3e;
-    border-radius: 6px;
-    padding: 12px;
-}
-.detail-section h4 {
-    color: #00e5ff;
-    font-size: .8rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid #1a1a3e;
-    padding-bottom: 4px;
-}
-.detail-section pre {
-    font-family: 'JetBrains Mono', 'Consolas', monospace;
-    font-size: .78rem;
-    color: #aaa;
-    white-space: pre-wrap;
-    word-break: break-all;
-    line-height: 1.5;
-    max-height: 350px;
-    overflow-y: auto;
-}
-.detail-section table.kv-table {
-    width: 100%;
-    font-size: .8rem;
-    border-collapse: collapse;
-}
-.kv-table td {
-    padding: 3px 6px;
-    border-bottom: 1px solid #1a1a2e;
-    white-space: normal;
-    max-width: none;
-    cursor: default;
-}
-.kv-table td:first-child {
-    color: #7ec8e3;
-    font-weight: 600;
-    width: 35%;
-    white-space: nowrap;
-}
-
-/* ── Hex viewer ───────────────────────────────────────────────────── */
-.hex-viewer {
-    font-family: 'JetBrains Mono', 'Consolas', monospace;
-    font-size: .75rem;
-    line-height: 1.6;
-    color: #8892b0;
-    background: #080818;
-    padding: 10px;
-    border-radius: 4px;
-    max-height: 300px;
-    overflow: auto;
-}
-
-/* ── Settings panel ───────────────────────────────────────────────── */
-.settings-btn { background:#1a1a3e; color:#00e5ff; border-color:#00e5ff33; font-size:.85rem; }
-.settings-btn:hover { background:#292950; color:#00e5ff; }
-.settings-overlay {
-    display:none; position:fixed; top:0; left:0; right:0; bottom:0;
-    background:rgba(0,0,0,.5); z-index:99;
-}
-.settings-overlay.active { display:block; }
-.settings-panel {
-    position:fixed; top:0; right:-480px; width:460px; max-width:90vw; height:100vh;
-    background:#111127; border-left:1px solid #1a1a3e; z-index:100;
-    overflow-y:auto; transition:right .3s ease; box-shadow:-4px 0 20px rgba(0,0,0,.5);
-}
-.settings-panel.active { right:0; }
-.settings-header {
-    display:flex; justify-content:space-between; align-items:center;
-    padding:16px 20px; border-bottom:1px solid #1a1a3e;
-    position:sticky; top:0; background:#111127; z-index:1;
-}
-.settings-header h2 { color:#00e5ff; font-size:1.1rem; font-weight:600; }
-.settings-body { padding:20px; }
-.settings-section {
-    margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid #1a1a3e;
-}
-.settings-section h3 {
-    color:#8892b0; font-size:.85rem; text-transform:uppercase;
-    letter-spacing:1px; margin-bottom:12px;
-}
-.settings-note { font-size:.78rem; color:#666; margin-bottom:12px; font-style:italic; }
-.settings-field { margin-bottom:12px; }
-.settings-field label {
-    display:block; font-size:.8rem; color:#7ec8e3; margin-bottom:4px; font-weight:600;
-}
-.settings-field input[type="text"],
-.settings-field input[type="number"] {
-    width:100%; background:#1a1a2e; color:#d0d0d0; border:1px solid #333;
-    padding:8px 12px; border-radius:4px; font-size:.85rem; outline:none;
-}
-.settings-field input:focus { border-color:#00e5ff; }
-.settings-actions { margin-bottom:24px; display:flex; align-items:center; gap:12px; }
-.settings-status { font-size:.8rem; color:#888; }
-.settings-status.success { color:#00e676; }
-.settings-status.error { color:#ff1744; }
-.proto-toggle {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:6px 0; border-bottom:1px solid #1a1a2e;
-}
-.proto-toggle-label { font-size:.85rem; color:#d0d0d0; display:flex; align-items:center; gap:8px; }
-.proto-toggle-port { font-size:.75rem; color:#666; }
-.toggle-switch { position:relative; width:40px; height:22px; display:inline-block; }
-.toggle-switch input { opacity:0; width:0; height:0; }
-.toggle-slider {
-    position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
-    background:#333; border-radius:22px; transition:.3s;
-}
-.toggle-slider::before {
-    content:""; position:absolute; height:16px; width:16px; left:3px; bottom:3px;
-    background:#888; border-radius:50%; transition:.3s;
-}
-.toggle-switch input:checked + .toggle-slider { background:#00838f; }
-.toggle-switch input:checked + .toggle-slider::before { transform:translateX(18px); background:#fff; }
-
-/* ── Action menu ──────────────────────────────────────────────────── */
-.action-cell {
-    overflow: visible !important;
-    position: relative;
-    text-overflow: clip !important;
-}
-.action-btn {
-    background: #1a1a3e;
-    color: #8892b0;
-    border: 1px solid #333;
-    padding: 3px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: .8rem;
-    transition: background .2s, color .2s;
-}
-.action-btn:hover { background: #292950; color: #fff; }
-.action-menu {
-    display: none;
-    position: fixed;
-    background: #1a1a2e;
-    border: 1px solid #333;
-    border-radius: 6px;
-    min-width: 150px;
-    z-index: 1000;
-    box-shadow: 0 4px 16px rgba(0,0,0,.5);
-    overflow: hidden;
-}
-.action-menu.open { display: block; }
-.action-menu-item {
-    display: block;
-    width: 100%;
-    padding: 8px 14px;
-    background: none;
-    border: none;
-    color: #d0d0d0;
-    font-size: .8rem;
-    text-align: left;
-    cursor: pointer;
-    transition: background .15s;
-}
-.action-menu-item:hover { background: #292950; }
-.action-menu-item.danger { color: #ff5252; }
-.action-menu-item.danger:hover { background: #3e1a1a; }
-
-/* ── Pagination ──────────────────────────────────────────────────── */
-.pagination {
-    padding: 12px 0;
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.pagination .page-btn {
-    background: #1a1a3e;
-    color: #8892b0;
-    border: 1px solid #333;
-    padding: 4px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: .8rem;
-    min-width: 32px;
-    text-align: center;
-    transition: background .2s, color .2s;
-}
-.pagination .page-btn:hover:not(:disabled):not(.active) { background: #292950; color: #fff; }
-.pagination .page-btn.active { background: #00838f; color: #fff; border-color: #00838f; }
-.pagination .page-btn:disabled { opacity: .4; cursor: default; }
-.pagination .page-ellipsis { color: #555; padding: 0 4px; font-size: .8rem; }
-.pagination .page-info { font-size: .8rem; color: #666; margin-left: 8px; }
-.pagination .page-goto {
-    display: flex; align-items: center; gap: 4px; margin-left: 12px;
-}
-.pagination .page-goto input {
-    width: 50px; background: #1a1a2e; color: #d0d0d0; border: 1px solid #333;
-    padding: 4px 6px; border-radius: 4px; font-size: .8rem; outline: none; text-align: center;
-}
-.pagination .page-goto input:focus { border-color: #00e5ff; }
-
-/* ── Clear log button ────────────────────────────────────────────── */
-.btn-danger { background: #5c1a1a; color: #ff5252; border-color: #5c1a1a; }
-.btn-danger:hover { background: #7a2222; color: #ff8a80; }
-
-/* ── Responsive ───────────────────────────────────────────────────── */
-@media (max-width: 768px) {
-    .header { padding: 10px 12px; }
-    .stats-bar, .filter-bar, .table-wrap { padding-left: 12px; padding-right: 12px; }
-    .detail-grid { grid-template-columns: 1fr; }
-}
-</style>
 </head>
 <body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><span class="slash">||</span> PEGA<span class="slash">/</span>PEGA</div>
+      <div class="brand-tagline">// multi-protocol request logger</div>
+    </div>
+    <nav class="nav">
+      <a href="/" aria-current="page">Dashboard</a>
+      <a href="/mock">Mock Rules</a>
+      <button type="button" id="settingsBtn">Settings</button>
+    </nav>
+    <div class="top-right">
+      <div class="live-pill"><span class="live-dot" id="wsDot"></span><span id="wsLabel">Connecting</span> · <span id="captureCount">0</span> captured</div>
+      <button class="theme-toggle" type="button" id="themeToggle">Dark</button>
+      <button class="theme-toggle" type="button" id="logoutBtn" style="display:none;">Logout</button>
+    </div>
+  </header>
 
-<!-- ── Header ──────────────────────────────────────────────────────── -->
-<div class="header">
-    <div style="display:flex;align-items:center;gap:16px;">
-        <span class="header-title">PEGA-PEGA</span>
-        <span class="header-subtitle">Multi-Protocol Request Logger</span>
-        <a href="/mock" style="color:#8888aa;font-size:.85rem;padding:4px 10px;border-radius:4px;transition:background .2s,color .2s;margin-left:8px;" onmouseover="this.style.background='#1a1a3e';this.style.color='#7ec8e3'" onmouseout="this.style.background='';this.style.color='#8888aa'">Mock Rules</a>
-    </div>
-    <div style="display:flex;align-items:center;gap:16px;">
-        <div class="ws-indicator">
-            <span class="ws-dot" id="wsDot"></span>
-            <span id="wsLabel">Connecting...</span>
+  <section class="stats" id="statsBar"></section>
+
+  <div class="work">
+    <aside class="side">
+      <section>
+        <h4>Saved searches</h4>
+        <div class="side-list" id="savedSearches"></div>
+      </section>
+      <section>
+        <h4>Quick filters</h4>
+        <div class="side-list">
+          <button class="side-item" type="button" data-quick="all"><span>All protocols</span><span class="badge">all</span></button>
+          <button class="side-item" type="button" data-quick="creds"><span>Cleartext creds</span><span class="badge">auth</span></button>
+          <button class="side-item" type="button" data-quick="post"><span>POST bodies</span><span class="badge">http</span></button>
+          <button class="side-item" type="button" data-quick="failed"><span>Failed binds</span><span class="badge">ldap</span></button>
         </div>
-        <button class="btn settings-btn" onclick="toggleSettings()" title="Settings">&#9881; Settings</button>
-        <button class="btn" id="logoutBtn" onclick="doLogout()" title="Logout" style="display:none;">&#x2190; Logout</button>
-    </div>
+      </section>
+      <section>
+        <h4>Blocked IPs</h4>
+        <div class="side-list" id="blockedList"></div>
+      </section>
+    </aside>
+
+    <main class="main">
+      <div class="toolbar">
+        <select id="protoFilter"><option value="">All protocols</option></select>
+        <div class="search"><span class="prompt">FIND</span><input id="searchInput" placeholder="Search subdomain, IP, summary, details..."><span class="hint" id="matchHint">0/0</span></div>
+        <div class="btn-row">
+          <button type="button" id="clearBtn">Clear</button>
+          <button type="button" id="saveSearchBtn">Save search</button>
+        </div>
+        <div class="btn-row">
+          <button type="button" id="exportBtn">Export</button>
+          <button type="button" id="clearLogBtn" data-danger="true">Clear log</button>
+        </div>
+      </div>
+      <div class="subbar">
+        <div><strong id="visibleCount">0</strong> matches</div>
+        <div>Page <strong id="pageLabel">1</strong></div>
+        <div class="ascii">/// live request capture</div>
+        <div id="clockLabel"></div>
+      </div>
+
+      <div class="dashboard-grid">
+        <section class="log">
+          <div class="log-grid" id="requestGrid">
+            <div class="log-head">
+              <div class="col-num">#</div><div>Time</div><div>Protocol</div><div>Source</div><div>Subdomain</div><div>Action</div><div>Summary</div><div style="justify-content:flex-end;">Size</div><div></div>
+            </div>
+          </div>
+          <div class="pagination" id="paginationBar"></div>
+        </section>
+        <aside class="stream">
+          <div class="stream-head">
+            <div>LIVE STREAM</div>
+            <div class="actions"><button type="button" id="pauseBtn">Pause</button><button type="button" id="clearStreamBtn">Clear</button></div>
+          </div>
+          <div class="stream-body" id="streamBody"></div>
+          <div class="stream-foot"><div id="streamCount">0 captured</div><div id="streamState">STREAMING</div></div>
+        </aside>
+      </div>
+    </main>
+  </div>
 </div>
 
-<!-- ── Stats bar ───────────────────────────────────────────────────── -->
-<div class="stats-bar" id="statsBar">
-    <!-- Populated by JS -->
-</div>
+<div id="drawerMount"></div>
 
-<!-- ── Filter bar ──────────────────────────────────────────────────── -->
-<div class="filter-bar">
-    <select id="protoFilter">
-        <option value="">All Protocols</option>
-    </select>
-    <input type="text" id="searchInput" placeholder="Search subdomain, IP, summary..." />
-    <button class="btn btn-primary" id="btnSearch" onclick="applyFilters()">Search</button>
-    <button class="btn" onclick="clearFilters()">Clear</button>
-    <span style="flex:1;"></span>
-    <button class="btn btn-danger" onclick="clearLog()" title="Delete all captured requests">&#x1f5d1; Clear Log</button>
-</div>
-
-<!-- ── Request table ───────────────────────────────────────────────── -->
-<div class="table-wrap">
-    <table class="req-table">
-        <thead>
-            <tr>
-                <th>Time</th>
-                <th>Protocol</th>
-                <th>Source</th>
-                <th>Subdomain</th>
-                <th>Summary</th>
-                <th style="width:60px;"></th>
-            </tr>
-        </thead>
-        <tbody id="reqBody">
-            <!-- Populated by JS -->
-        </tbody>
-    </table>
-    <div class="pagination" id="paginationBar">
-        <!-- Populated by JS -->
-    </div>
-</div>
-
-<!-- ── Settings Panel ──────────────────────────────────────────────── -->
-<div class="settings-overlay" id="settingsOverlay" onclick="toggleSettings()"></div>
-<div class="settings-panel" id="settingsPanel">
-    <div class="settings-header">
-        <h2>Settings</h2>
-        <button class="btn" onclick="toggleSettings()">&times; Close</button>
-    </div>
-    <div class="settings-body">
-        <div class="settings-section">
-            <h3>Server Configuration</h3>
-            <p class="settings-note">Changes are saved to the config file. Restart pega-pega for changes to take effect.</p>
-            <div class="settings-field">
-                <label for="cfgDomain">Domain</label>
-                <input type="text" id="cfgDomain" placeholder="pega.local" />
-            </div>
-            <div class="settings-field">
-                <label for="cfgResponseIp">Response IP</label>
-                <input type="text" id="cfgResponseIp" placeholder="auto-detect" />
-            </div>
-            <div class="settings-field">
-                <label for="cfgBindIp">Bind IP</label>
-                <input type="text" id="cfgBindIp" placeholder="0.0.0.0" />
-            </div>
-            <div class="settings-field">
-                <label for="cfgDashboardPort">Dashboard Port</label>
-                <input type="number" id="cfgDashboardPort" placeholder="8443" />
-            </div>
-            <div class="settings-field">
-                <label for="cfgPassword">Dashboard Password</label>
-                <input type="password" id="cfgPassword" placeholder="empty = no auth" />
-                <span id="passwordHint" style="font-size:.75rem;color:#666;margin-top:2px;"></span>
-            </div>
-        </div>
-        <div class="settings-section">
-            <h3>Protocols</h3>
-            <div id="protocolToggles"></div>
-        </div>
-        <div class="settings-actions">
-            <button class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
-            <span id="saveStatus" class="settings-status"></span>
-        </div>
-        <div class="settings-section">
-            <h3>Let's Encrypt</h3>
-            <p class="settings-note">Obtain free SSL certificates from Let's Encrypt. Requires a real domain pointed at this server and certbot installed.</p>
-            <div class="proto-toggle" style="border-bottom:none;margin-bottom:8px;">
-                <div class="proto-toggle-label">
-                    <span style="color:#d0d0d0;">Enable Let's Encrypt</span>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="cfgLeEnabled" />
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="settings-field">
-                <label for="cfgLeEmail">Email (required by Let's Encrypt)</label>
-                <input type="text" id="cfgLeEmail" placeholder="admin@example.com" />
-            </div>
-            <div style="display:flex;align-items:center;gap:12px;margin-top:12px;">
-                <button class="btn btn-primary" id="btnLeCert" onclick="requestLeCert()">Request Certificate</button>
-                <span id="leStatus" class="settings-status"></span>
-            </div>
-            <div id="leCertInfo" style="margin-top:8px;font-size:.8rem;color:#666;"></div>
-        </div>
-        <div class="settings-section">
-            <h3>Software Update</h3>
-            <div class="settings-field">
-                <label>Current Version</label>
-                <span id="currentVersion" style="font-family:monospace;color:#d0d0d0;">loading...</span>
-            </div>
-            <button class="btn btn-primary" id="btnUpdate" onclick="triggerUpdate()">Check for Updates</button>
-            <div id="updateStatus" class="settings-status" style="margin-top:8px;"></div>
-        </div>
-    </div>
-</div>
+<div class="drawer-scrim" id="settingsScrim" hidden></div>
+<aside class="drawer" id="settingsDrawer" hidden>
+  <div class="drawer-head">
+    <div><div class="eyebrow">PEGA-PEGA</div><h2>Settings</h2></div>
+    <button class="x" type="button" id="closeSettings" aria-label="Close settings">x</button>
+  </div>
+  <div class="drawer-body">
+    <section class="d-section">
+      <h5>Server configuration</h5>
+      <div class="settings-form">
+        <label>Domain<input id="cfgDomain"></label>
+        <label>Response IP<input id="cfgResponseIp"></label>
+        <label>Bind IP<input id="cfgBindIp"></label>
+        <label>Dashboard port<input id="cfgDashboardPort" type="number"></label>
+        <label>Dashboard password<input id="cfgPassword" type="password" placeholder="leave blank to keep current"></label>
+      </div>
+    </section>
+    <section class="d-section">
+      <h5>Protocols</h5>
+      <div id="protocolToggles" class="settings-stack"></div>
+    </section>
+    <section class="d-section">
+      <h5>Let's Encrypt</h5>
+      <div class="settings-form">
+        <label class="settings-check"><input id="cfgLeEnabled" type="checkbox"> Enable Let's Encrypt</label>
+        <label>Email<input id="cfgLeEmail"></label>
+      </div>
+      <div class="drawer-actions inline-actions">
+        <button type="button" id="btnLeCert">Request certificate</button>
+        <span id="leStatus" class="dim"></span>
+      </div>
+      <div id="leCertInfo" class="dim"></div>
+    </section>
+    <section class="d-section">
+      <h5>Software update</h5>
+      <div class="kv"><div class="k">current version</div><div class="v" id="currentVersion">loading...</div></div>
+      <div class="drawer-actions inline-actions"><button type="button" id="btnUpdate">Check for updates</button><span id="updateStatus" class="dim"></span></div>
+    </section>
+  </div>
+  <div class="drawer-foot">
+    <button type="button" data-variant="primary" id="saveConfigBtn">Save configuration</button>
+    <span id="saveStatus" class="dim"></span>
+  </div>
+</aside>
 
 <script src="/static/app.js"></script>
 <script>
-/* ── Protocol colors (match Rich terminal display) ──────────────── */
-const PROTO_COLORS = {
-    HTTP:       { bg: '#1b5e20', fg: '#a5d6a7' },
-    HTTPS:      { bg: '#2e7d32', fg: '#c8e6c9' },
-    DNS:        { bg: '#006064', fg: '#80deea' },
-    FTP:        { bg: '#f57f17', fg: '#fff9c4' },
-    SMTP:       { bg: '#6a1b9a', fg: '#ce93d8' },
-    POP3:       { bg: '#b71c1c', fg: '#ef9a9a' },
-    IMAP:       { bg: '#4a0000', fg: '#e57373' },
-    SSH:        { bg: '#c62828', fg: '#ffcdd2' },
-    TELNET:     { bg: '#f9a825', fg: '#fff176' },
-    LDAP:       { bg: '#0d47a1', fg: '#90caf9' },
-    MYSQL:      { bg: '#1565c0', fg: '#bbdefb' },
-    RAW_TCP:    { bg: '#424242', fg: '#e0e0e0' },
-    SNMP:       { bg: '#00838f', fg: '#80deea' },
-    SYSLOG:     { bg: '#7b1fa2', fg: '#e1bee7' },
-};
-
-const PROTOCOLS = Object.keys(PROTO_COLORS);
-const PAGE_SIZE = 50;
-
-let currentPage = 0;
-let currentProto = '';
-let currentSearch = '';
-let expandedId = null;
+const PROTOCOLS = ["HTTP","HTTPS","DNS","FTP","SMTP","POP3","IMAP","SSH","TELNET","LDAP","MYSQL","RAW_TCP","SNMP","SYSLOG"];
+const PAGE_SIZE = 100;
+let state = { page: 0, proto: "", search: "", total: 0, rows: [], selected: null, paused: false, stream: [], recentEvents: [], statsData: null, configLoaded: false };
 let ws = null;
 
-/* ── Populate protocol dropdown ─────────────────────────────────── */
-(function initProtoDropdown() {
-    const sel = document.getElementById('protoFilter');
-    PROTOCOLS.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p;
-        opt.textContent = p;
-        sel.appendChild(opt);
-    });
-})();
+function protoVar(proto) { return `var(--p-${String(proto || "raw_tcp").toLowerCase()})`; }
+function shortProto(proto) { return proto === "RAW_TCP" ? "TCP" : proto; }
+function rawSize(r) { return r.raw_data ? Math.floor(r.raw_data.length / 2) : 0; }
+function savedSearches() { try { return JSON.parse(localStorage.getItem("pega-saved-searches") || "[]"); } catch { return []; } }
+function setSavedSearches(items) { localStorage.setItem("pega-saved-searches", JSON.stringify(items)); renderSavedSearches(); }
+function downloadJson(name, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("pega-theme", theme);
+  document.getElementById("themeToggle").textContent = theme === "light" ? "Light" : "Dark";
+}
 
-/* ── Stats ───────────────────────────────────────────────────────── */
+function init() {
+  applyTheme(localStorage.getItem("pega-theme") || "dark");
+  PROTOCOLS.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p; opt.textContent = shortProto(p);
+    document.getElementById("protoFilter").appendChild(opt);
+  });
+  bindEvents();
+  renderSavedSearches();
+  loadBlockedIps();
+  loadStats();
+  loadRecentEvents();
+  loadRequests();
+  loadConfig(true);
+  connectWS();
+  window.addEventListener("resize", renderStats);
+  setInterval(() => document.getElementById("clockLabel").textContent = new Date().toLocaleString(), 1000);
+  if (new URLSearchParams(location.search).get("settings") === "1") openSettings();
+}
+
+function bindEvents() {
+  document.getElementById("themeToggle").onclick = () => applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
+  document.getElementById("protoFilter").onchange = () => { state.proto = protoFilter.value; state.page = 0; loadRequests(); };
+  document.getElementById("searchInput").addEventListener("keydown", e => { if (e.key === "Enter") { state.search = searchInput.value.trim(); state.page = 0; loadRequests(); } });
+  document.getElementById("clearBtn").onclick = clearFilters;
+  document.getElementById("saveSearchBtn").onclick = saveCurrentSearch;
+  document.getElementById("exportBtn").onclick = () => downloadJson("pega-pega-requests.json", { filters: { protocol: state.proto, search: state.search }, requests: state.rows });
+  document.getElementById("clearLogBtn").onclick = clearLog;
+  document.getElementById("pauseBtn").onclick = togglePause;
+  document.getElementById("clearStreamBtn").onclick = () => { state.stream = []; renderStream(); };
+  document.querySelectorAll("[data-quick]").forEach(btn => btn.onclick = () => applyQuick(btn.dataset.quick));
+  document.getElementById("settingsBtn").onclick = openSettings;
+  document.getElementById("settingsScrim").onclick = closeSettings;
+  document.getElementById("closeSettings").onclick = closeSettings;
+  document.getElementById("saveConfigBtn").onclick = saveConfig;
+  document.getElementById("btnLeCert").onclick = requestLeCert;
+  document.getElementById("btnUpdate").onclick = triggerUpdate;
+  document.getElementById("logoutBtn").onclick = doLogout;
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); closeSettings(); } });
+}
+
 async function loadStats() {
-    try {
-        const resp = await fetch('/api/stats');
-        const data = await resp.json();
-        const bar = document.getElementById('statsBar');
-        bar.innerHTML = '';
-        PROTOCOLS.forEach(p => {
-            const count = (data.protocols && data.protocols[p]) || 0;
-            const c = PROTO_COLORS[p];
-            const badge = document.createElement('span');
-            badge.className = 'stat-badge';
-            badge.style.background = c.bg;
-            badge.style.color = c.fg;
-            badge.style.borderColor = c.fg + '33';
-            badge.innerHTML = `${escapeHtml(p)} <span class="stat-count">${count}</span>`;
-            badge.onclick = () => {
-                document.getElementById('protoFilter').value = p;
-                applyFilters();
-            };
-            bar.appendChild(badge);
-        });
-        /* Total */
-        const total = document.createElement('span');
-        total.className = 'stat-badge';
-        total.style.background = '#222';
-        total.style.color = '#aaa';
-        total.style.borderColor = '#555';
-        total.innerHTML = `TOTAL <span class="stat-count">${data.total || 0}</span>`;
-        total.onclick = () => { document.getElementById('protoFilter').value = ''; applyFilters(); };
-        bar.appendChild(total);
-    } catch (e) {
-        console.error('Stats load error', e);
-    }
+  const data = await fetchJson("/api/stats");
+  if (!data) return;
+  state.statsData = data;
+  renderStats();
 }
 
-/* ── Load requests table ─────────────────────────────────────────── */
+async function loadRecentEvents() {
+  const data = await fetchJson("/api/requests?limit=1000");
+  if (!data) return;
+  state.recentEvents = data.requests || [];
+  renderStats();
+}
+
+function renderStats() {
+  const data = state.statsData;
+  if (!data) return;
+  const counts = data.protocols || {};
+  const bar = document.getElementById("statsBar");
+  const minWidth = 150;
+  const slots = Math.max(3, Math.min(PROTOCOLS.length + 1, Math.floor((bar.clientWidth || window.innerWidth) / minWidth)));
+  const ranked = ["TOTAL", ...PROTOCOLS.slice().sort((a,b) => (counts[b] || 0) - (counts[a] || 0)).slice(0, slots - 1)];
+  document.getElementById("captureCount").textContent = data.total || 0;
+  bar.style.gridTemplateColumns = `repeat(${ranked.length}, minmax(0, 1fr))`;
+  bar.innerHTML = ranked.map(p => {
+    const count = p === "TOTAL" ? data.total || 0 : counts[p] || 0;
+    const active = (p === "TOTAL" && !state.proto) || state.proto === p;
+    return `<button class="stat" type="button" data-proto="${p === "TOTAL" ? "" : p}" data-active="${active}">
+      <span class="stat-tag" style="--p-c:${p === "TOTAL" ? "var(--accent)" : protoVar(p)}">${shortProto(p)}</span>
+      <span class="stat-count">${String(count).padStart(2, "0")}</span>
+      <span class="stat-spark" style="--p-c:${p === "TOTAL" ? "var(--accent)" : protoVar(p)}">${spark(p)}</span>
+    </button>`;
+  }).join("");
+  document.querySelectorAll("#statsBar [data-proto]").forEach(btn => btn.onclick = () => {
+    state.proto = btn.dataset.proto;
+    protoFilter.value = state.proto;
+    state.page = 0;
+    loadRequests();
+  });
+}
+
+function spark(proto) {
+  const buckets = 24;
+  const windowMs = 10 * 60 * 1000;
+  const now = Date.now();
+  const values = new Array(buckets).fill(0);
+  for (const req of state.recentEvents) {
+    if (proto !== "TOTAL" && req.protocol !== proto) continue;
+    const ts = new Date(req.timestamp).getTime();
+    if (!Number.isFinite(ts)) continue;
+    const age = now - ts;
+    if (age < 0 || age > windowMs) continue;
+    const index = buckets - 1 - Math.floor(age / (windowMs / buckets));
+    if (index >= 0 && index < buckets) values[index] += 1;
+  }
+  const max = Math.max(1, ...values);
+  return values.map(v => {
+    const height = Math.max(2, Math.round((v / max) * 18));
+    return `<span title="${v} requests" style="height:${height}px"></span>`;
+  }).join("");
+}
+
 async function loadRequests() {
-    const params = new URLSearchParams();
-    if (currentProto) params.set('protocol', currentProto);
-    if (currentSearch) params.set('search', currentSearch);
-    params.set('limit', PAGE_SIZE);
-    params.set('offset', currentPage * PAGE_SIZE);
-
-    try {
-        const resp = await fetch('/api/requests?' + params.toString());
-        const data = await resp.json();
-        renderTable(data.requests || [], false);
-        /* Pagination controls */
-        const total = data.total || 0;
-        const maxPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
-        renderPagination(currentPage, maxPage, total);
-    } catch (e) {
-        console.error('Request load error', e);
-    }
+  const params = new URLSearchParams({ limit: PAGE_SIZE, offset: state.page * PAGE_SIZE });
+  if (state.proto) params.set("protocol", state.proto);
+  if (state.search) params.set("search", state.search);
+  const data = await fetchJson(`/api/requests?${params}`);
+  if (!data) return;
+  state.rows = data.requests || [];
+  state.total = data.total || 0;
+  renderRows();
+  renderPagination();
+  loadStats();
 }
 
-function renderTable(rows, prepend) {
-    const tbody = document.getElementById('reqBody');
-    if (!prepend) {
-        tbody.innerHTML = '';
-        expandedId = null;
-    }
-    rows.forEach((r, idx) => {
-        const tr = buildRow(r);
-        if (prepend) {
-            tr.classList.add('new-row');
-            tbody.insertBefore(tr, tbody.firstChild);
-        } else {
-            tbody.appendChild(tr);
-        }
-    });
+function renderRows(newIds = new Set()) {
+  const grid = document.getElementById("requestGrid");
+  grid.querySelectorAll(".log-row,.empty-log").forEach(el => el.remove());
+  if (!state.rows.length) {
+    grid.insertAdjacentHTML("beforeend", `<div class="empty-log">/// nothing matches the current filter</div>`);
+  }
+  state.rows.forEach((r, i) => {
+    const action = requestAction(r);
+    const summary = summaryWithoutAction(r.summary || "", action);
+    grid.insertAdjacentHTML("beforeend", `<button class="log-row" type="button" data-id="${escapeHtml(r.id)}" data-selected="${state.selected && state.selected.id === r.id}" data-new="${newIds.has(r.id)}">
+      <div class="col-num">${String(state.page * PAGE_SIZE + i + 1).padStart(3, "0")}</div>
+      <div class="col-time">${escapeHtml(formatTime(r.timestamp))}</div>
+      <div class="col-protocol"><span class="p-tag" style="--p-c:${protoVar(r.protocol)}">${escapeHtml(shortProto(r.protocol))}</span></div>
+      <div>${escapeHtml(r.source_ip || "-")}:<span class="dim">${escapeHtml(r.source_port || 0)}</span></div>
+      <div class="${r.subdomain ? "" : "dim"}">${escapeHtml(r.subdomain || "-")}</div>
+      <div><span class="action-tag">${escapeHtml(action)}</span></div>
+      <div class="col-summary">${summaryHtml(summary)}</div>
+      <div class="col-size">${rawSize(r)}B</div>
+      <div class="col-status">›</div>
+    </button>`);
+  });
+  document.querySelectorAll(".log-row").forEach(row => row.onclick = () => openDrawer(row.dataset.id));
+  document.getElementById("visibleCount").textContent = state.total;
+  document.getElementById("matchHint").textContent = `${state.rows.length}/${state.total}`;
+  document.getElementById("pageLabel").textContent = String(state.page + 1);
 }
 
-function buildRow(r) {
-    const tr = document.createElement('tr');
-    tr.dataset.id = r.id;
-    const c = PROTO_COLORS[r.protocol] || PROTO_COLORS.RAW_TCP;
-
-    tr.innerHTML = `
-        <td>${escapeHtml(formatTime(r.timestamp))}</td>
-        <td><span class="proto-badge" style="background:${c.bg};color:${c.fg}">${escapeHtml(r.protocol)}</span></td>
-        <td>${escapeHtml(r.source_ip)}:${r.source_port || 0}</td>
-        <td>${escapeHtml(r.subdomain || '-')}</td>
-        <td>${escapeHtml((r.summary || '').substring(0, 120))}</td>
-        <td class="action-cell">
-            <button class="action-btn" onclick="event.stopPropagation();toggleActionMenu(this)">&#8943;</button>
-            <div class="action-menu">
-                <button class="action-menu-item" onclick="event.stopPropagation();blockIp('${escapeHtml(r.source_ip)}')">&#x1f6ab; Block IP</button>
-                <button class="action-menu-item danger" onclick="event.stopPropagation();deleteRequest('${escapeHtml(r.id)}')">&#x1f5d1; Delete</button>
-            </div>
-        </td>
-    `;
-    tr.onclick = () => toggleDetail(r.id, tr);
-    return tr;
+function summaryHtml(summary) {
+  const safe = escapeHtml(summary);
+  return safe.replace(/\b(GET|POST|PUT|PATCH|DELETE|QUERY|LOGIN|AUTH|BIND)\b/g, '<span class="kw">$1</span>');
 }
 
-/* ── Detail expansion ────────────────────────────────────────────── */
-async function toggleDetail(id, rowEl) {
-    /* Collapse if already expanded */
-    const existing = document.querySelector(`tr.detail-row[data-detail-id="${id}"]`);
-    if (existing) {
-        existing.remove();
-        expandedId = null;
-        return;
-    }
-    /* Collapse any other */
-    document.querySelectorAll('tr.detail-row').forEach(el => el.remove());
-
-    try {
-        const resp = await fetch(`/api/requests/${id}`);
-        if (!resp.ok) return;
-        const r = await resp.json();
-
-        const detailTr = document.createElement('tr');
-        detailTr.className = 'detail-row';
-        detailTr.dataset.detailId = id;
-        const td = document.createElement('td');
-        td.colSpan = 6;
-        td.innerHTML = buildDetailHTML(r);
-        detailTr.appendChild(td);
-        rowEl.insertAdjacentElement('afterend', detailTr);
-        expandedId = id;
-    } catch (e) {
-        console.error('Detail load error', e);
-    }
+function requestAction(r) {
+  const d = r.details || {};
+  const candidates = [
+    d.method,
+    d.command,
+    d.operation,
+    d.qtype && "QUERY",
+    d.username && "LOGIN",
+    (r.summary || "").trim().split(/\s+/)[0],
+  ];
+  const value = candidates.find(Boolean) || "-";
+  return String(value).toUpperCase();
 }
 
-function buildDetailHTML(r) {
-    let html = '<div class="detail-grid">';
-
-    /* Meta info */
-    html += `<div class="detail-section">
-        <h4>Request Info</h4>
-        <table class="kv-table">
-            <tr><td>ID</td><td>${escapeHtml(r.id)}</td></tr>
-            <tr><td>Timestamp</td><td>${escapeHtml(formatDateTime(r.timestamp))}</td></tr>
-            <tr><td>Protocol</td><td>${escapeHtml(r.protocol)}</td></tr>
-            <tr><td>Source</td><td>${escapeHtml(r.source_ip)}:${r.source_port}</td></tr>
-            <tr><td>Dest Port</td><td>${r.dest_port}</td></tr>
-            <tr><td>Subdomain</td><td>${escapeHtml(r.subdomain || '-')}</td></tr>
-            <tr><td>Summary</td><td>${escapeHtml(r.summary)}</td></tr>
-        </table>
-    </div>`;
-
-    /* Protocol-specific details */
-    html += buildProtocolDetail(r);
-
-    /* Generic details dump */
-    if (r.details && typeof r.details === 'object' && Object.keys(r.details).length > 0) {
-        html += `<div class="detail-section">
-            <h4>All Details</h4>
-            <table class="kv-table">`;
-        for (const [k, v] of Object.entries(r.details)) {
-            const val = (typeof v === 'object') ? JSON.stringify(v, null, 2) : String(v);
-            html += `<tr><td>${escapeHtml(k)}</td><td><pre>${escapeHtml(val)}</pre></td></tr>`;
-        }
-        html += '</table></div>';
-    }
-
-    /* Raw hex viewer */
-    if (r.raw_data && r.raw_data.length > 0) {
-        html += `<div class="detail-section">
-            <h4>Raw Data (Hex)</h4>
-            <div class="hex-viewer">${escapeHtml(hexDump(r.raw_data))}</div>
-        </div>`;
-    }
-
-    html += '</div>';
-    return html;
+function summaryWithoutAction(summary, action) {
+  const trimmed = String(summary || "").trim();
+  if (!trimmed || !action || action === "-") return trimmed;
+  const re = new RegExp(`^${action.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i");
+  return trimmed.replace(re, "") || trimmed;
 }
 
-function buildProtocolDetail(r) {
-    const d = r.details || {};
-    const proto = r.protocol;
-
-    if (proto === 'HTTP' || proto === 'HTTPS') {
-        let h = '<div class="detail-section"><h4>HTTP Detail</h4>';
-        if (d.method || d.path) {
-            h += `<p style="color:#00e5ff;margin-bottom:8px;"><strong>${escapeHtml(d.method || 'GET')}</strong> ${escapeHtml(d.path || '/')}</p>`;
-        }
-        if (d.host) {
-            h += `<p style="margin-bottom:8px;">Host: <strong>${escapeHtml(d.host)}</strong></p>`;
-        }
-        if (d.headers && typeof d.headers === 'object') {
-            h += '<table class="kv-table">';
-            const hdrs = (typeof d.headers === 'string') ? JSON.parse(d.headers) : d.headers;
-            if (Array.isArray(hdrs)) {
-                hdrs.forEach(pair => {
-                    if (Array.isArray(pair) && pair.length >= 2) {
-                        h += `<tr><td>${escapeHtml(pair[0])}</td><td>${escapeHtml(pair[1])}</td></tr>`;
-                    }
-                });
-            } else {
-                for (const [hk, hv] of Object.entries(hdrs)) {
-                    h += `<tr><td>${escapeHtml(hk)}</td><td>${escapeHtml(hv)}</td></tr>`;
-                }
-            }
-            h += '</table>';
-        }
-        if (d.body) {
-            h += `<h4 style="margin-top:10px;">Body</h4><pre>${escapeHtml(d.body)}</pre>`;
-        }
-        h += '</div>';
-        return h;
+function renderPagination() {
+  const pages = Math.max(1, Math.ceil(state.total / PAGE_SIZE));
+  const bar = document.getElementById("paginationBar");
+  bar.innerHTML = `<button class="page-btn" ${state.page <= 0 ? "disabled" : ""} data-page="${state.page - 1}">Prev</button>
+    <span class="page-info">${state.total} total · ${pages} pages</span>
+    <button class="page-btn" ${state.page >= pages - 1 ? "disabled" : ""} data-page="${state.page + 1}">Next</button>
+    <span class="page-goto"><span class="dim">Go to</span><input id="gotoPage" type="number" min="1" max="${pages}" placeholder="${state.page + 1}"></span>`;
+  bar.querySelectorAll("[data-page]").forEach(btn => btn.onclick = () => { state.page = Number(btn.dataset.page); loadRequests(); });
+  document.getElementById("gotoPage").onkeydown = e => {
+    if (e.key === "Enter") {
+      const page = Math.max(1, Math.min(pages, Number(e.target.value || 1)));
+      state.page = page - 1; loadRequests();
     }
-
-    if (proto === 'DNS') {
-        let h = '<div class="detail-section"><h4>DNS Query</h4>';
-        h += '<table class="kv-table">';
-        if (d.qname) h += `<tr><td>Query Name</td><td>${escapeHtml(d.qname)}</td></tr>`;
-        if (d.qtype) h += `<tr><td>Query Type</td><td>${escapeHtml(d.qtype)}</td></tr>`;
-        if (d.qclass) h += `<tr><td>Query Class</td><td>${escapeHtml(d.qclass)}</td></tr>`;
-        if (d.txn_id !== undefined) h += `<tr><td>Transaction ID</td><td>${d.txn_id}</td></tr>`;
-        if (d.flags !== undefined) h += `<tr><td>Flags</td><td>${escapeHtml(String(d.flags))}</td></tr>`;
-        h += '</table></div>';
-        return h;
-    }
-
-    if (proto === 'SMTP') {
-        let h = '<div class="detail-section"><h4>SMTP Envelope</h4>';
-        h += '<table class="kv-table">';
-        if (d.mail_from) h += `<tr><td>MAIL FROM</td><td>${escapeHtml(d.mail_from)}</td></tr>`;
-        if (d.rcpt_to) {
-            const rcpts = Array.isArray(d.rcpt_to) ? d.rcpt_to.join(', ') : d.rcpt_to;
-            h += `<tr><td>RCPT TO</td><td>${escapeHtml(rcpts)}</td></tr>`;
-        }
-        if (d.ehlo) h += `<tr><td>EHLO</td><td>${escapeHtml(d.ehlo)}</td></tr>`;
-        h += '</table>';
-        if (d.data) {
-            h += `<h4 style="margin-top:10px;">Message Data</h4><pre>${escapeHtml(d.data)}</pre>`;
-        }
-        h += '</div>';
-        return h;
-    }
-
-    if (proto === 'FTP') {
-        let h = '<div class="detail-section"><h4>FTP Session</h4>';
-        if (d.username) h += `<p>User: <strong>${escapeHtml(d.username)}</strong></p>`;
-        if (d.password) h += `<p>Pass: <strong>${escapeHtml(d.password)}</strong></p>`;
-        if (d.commands && Array.isArray(d.commands)) {
-            h += '<pre>' + d.commands.map(c => escapeHtml(c)).join('\n') + '</pre>';
-        }
-        h += '</div>';
-        return h;
-    }
-
-    if (proto === 'SSH') {
-        let h = '<div class="detail-section"><h4>SSH Info</h4>';
-        h += '<table class="kv-table">';
-        if (d.client_version) h += `<tr><td>Client Version</td><td>${escapeHtml(d.client_version)}</td></tr>`;
-        if (d.client_banner) h += `<tr><td>Client Banner</td><td>${escapeHtml(d.client_banner)}</td></tr>`;
-        h += '</table></div>';
-        return h;
-    }
-
-    if (proto === 'POP3' || proto === 'IMAP') {
-        let h = `<div class="detail-section"><h4>${escapeHtml(proto)} Session</h4>`;
-        h += '<table class="kv-table">';
-        if (d.username) h += `<tr><td>Username</td><td>${escapeHtml(d.username)}</td></tr>`;
-        if (d.password) h += `<tr><td>Password</td><td>${escapeHtml(d.password)}</td></tr>`;
-        if (d.commands && Array.isArray(d.commands)) {
-            h += `<tr><td>Commands</td><td><pre>${d.commands.map(c => escapeHtml(c)).join('\n')}</pre></td></tr>`;
-        }
-        h += '</table></div>';
-        return h;
-    }
-
-    if (proto === 'TELNET') {
-        let h = '<div class="detail-section"><h4>Telnet Session</h4>';
-        if (d.input) {
-            h += `<pre>${escapeHtml(d.input)}</pre>`;
-        }
-        h += '</div>';
-        return h;
-    }
-
-    if (proto === 'LDAP') {
-        let h = '<div class="detail-section"><h4>LDAP Request</h4>';
-        h += '<table class="kv-table">';
-        if (d.bind_dn) h += `<tr><td>Bind DN</td><td>${escapeHtml(d.bind_dn)}</td></tr>`;
-        if (d.operation) h += `<tr><td>Operation</td><td>${escapeHtml(d.operation)}</td></tr>`;
-        if (d.base_dn) h += `<tr><td>Base DN</td><td>${escapeHtml(d.base_dn)}</td></tr>`;
-        if (d.filter) h += `<tr><td>Filter</td><td>${escapeHtml(d.filter)}</td></tr>`;
-        h += '</table></div>';
-        return h;
-    }
-
-    if (proto === 'MYSQL') {
-        let h = '<div class="detail-section"><h4>MySQL Connection</h4>';
-        h += '<table class="kv-table">';
-        if (d.username) h += `<tr><td>Username</td><td>${escapeHtml(d.username)}</td></tr>`;
-        if (d.database) h += `<tr><td>Database</td><td>${escapeHtml(d.database)}</td></tr>`;
-        if (d.client_plugin) h += `<tr><td>Auth Plugin</td><td>${escapeHtml(d.client_plugin)}</td></tr>`;
-        h += '</table></div>';
-        return h;
-    }
-
-    if (proto === 'SNMP') {
-        let h = '<div class="detail-section"><h4>SNMP Request</h4>';
-        h += '<table class="kv-table">';
-        if (d.version) h += `<tr><td>Version</td><td>${escapeHtml(d.version)}</td></tr>`;
-        if (d.community) h += `<tr><td>Community</td><td>${escapeHtml(d.community)}</td></tr>`;
-        if (d.pdu_type) h += `<tr><td>PDU Type</td><td>${escapeHtml(d.pdu_type)}</td></tr>`;
-        if (d.oids && Array.isArray(d.oids)) {
-            h += `<tr><td>OIDs</td><td>${d.oids.map(o => escapeHtml(o)).join('<br>')}</td></tr>`;
-        }
-        h += '</table></div>';
-        return h;
-    }
-
-    if (proto === 'SYSLOG') {
-        let h = '<div class="detail-section"><h4>Syslog Message</h4>';
-        h += '<table class="kv-table">';
-        if (d.facility) h += `<tr><td>Facility</td><td>${escapeHtml(d.facility)}</td></tr>`;
-        if (d.severity) h += `<tr><td>Severity</td><td>${escapeHtml(d.severity)}</td></tr>`;
-        if (d.hostname) h += `<tr><td>Hostname</td><td>${escapeHtml(d.hostname)}</td></tr>`;
-        if (d.app_name) h += `<tr><td>App Name</td><td>${escapeHtml(d.app_name)}</td></tr>`;
-        if (d.message) h += `<tr><td>Message</td><td>${escapeHtml(d.message)}</td></tr>`;
-        h += '</table></div>';
-        return h;
-    }
-
-    /* Fallback: nothing extra */
-    return '';
+  };
 }
 
-/* ── Filters & pagination ────────────────────────────────────────── */
-function applyFilters() {
-    currentProto = document.getElementById('protoFilter').value;
-    currentSearch = document.getElementById('searchInput').value.trim();
-    currentPage = 0;
-    loadRequests();
-    loadStats();
+async function openDrawer(id) {
+  const req = await fetchJson(`/api/requests/${encodeURIComponent(id)}`);
+  if (!req) return;
+  state.selected = req;
+  renderRows();
+  const details = req.details || {};
+  const headers = details.headers && typeof details.headers === "object" ? details.headers : null;
+  const rawText = req.raw_data ? hexDump(req.raw_data) : "(no raw bytes)";
+  drawerMount.innerHTML = `<div class="drawer-scrim" onclick="closeDrawer()"></div>
+    <aside class="drawer" role="dialog" aria-label="Request detail">
+      <div class="drawer-head">
+        <div><div class="eyebrow"><span class="p-tag" style="--p-c:${protoVar(req.protocol)}">${escapeHtml(shortProto(req.protocol))}</span><span class="dim">${escapeHtml(formatDateTime(req.timestamp))}</span><span class="dim">${escapeHtml(req.id.slice(0, 12))}</span></div><h2>${summaryHtml(req.summary || "")}</h2></div>
+        <button class="x" type="button" onclick="closeDrawer()" aria-label="Close">x</button>
+      </div>
+      <div class="drawer-actions">
+        <button type="button" onclick="blockIp('${escapeJs(req.source_ip || "")}')">Block IP</button>
+        <button type="button" onclick="copyCurl()">Copy curl</button>
+        <button type="button" onclick="exportSelected()">Export</button>
+        <div class="spacer"></div>
+        <button type="button" data-danger="true" onclick="deleteSelected()">Delete</button>
+      </div>
+      <div class="drawer-body">
+        ${section("Parsed fields", kvTable(details))}
+        ${headers ? section("Headers", headersTable(headers)) : ""}
+        ${details.body ? section("Body", `<pre class="code-block">${escapeHtml(details.body)}</pre>`) : ""}
+        ${section("Connection", kvTable({ source: `${req.source_ip}:${req.source_port}`, dest_port: req.dest_port, subdomain: req.subdomain || "-", size: `${rawSize(req)} bytes`, timestamp: req.timestamp }))}
+        ${section("Raw payload", `<pre class="code-block">${escapeHtml(rawPreview(req.raw_data))}</pre>`)}
+        ${section("Hex", `<pre class="code-block">${escapeHtml(rawText)}</pre>`)}
+      </div>
+      <div class="drawer-foot"><div><kbd>Esc</kbd> close</div><div class="dim">${escapeHtml(req.protocol)} · ${rawSize(req)}B</div></div>
+    </aside>`;
 }
-function clearFilters() {
-    document.getElementById('protoFilter').value = '';
-    document.getElementById('searchInput').value = '';
-    currentProto = '';
-    currentSearch = '';
-    currentPage = 0;
-    loadRequests();
-    loadStats();
-}
-function goToPage(p) { currentPage = p; loadRequests(); }
-
-function renderPagination(current, maxPage, total) {
-    const bar = document.getElementById('paginationBar');
-    bar.innerHTML = '';
-    const totalPages = maxPage + 1;
-
-    /* Prev button */
-    const prev = document.createElement('button');
-    prev.className = 'page-btn';
-    prev.innerHTML = '&laquo;';
-    prev.disabled = current <= 0;
-    prev.onclick = () => goToPage(current - 1);
-    bar.appendChild(prev);
-
-    /* Page number buttons */
-    const pages = [];
-    if (totalPages <= 7) {
-        for (let i = 0; i < totalPages; i++) pages.push(i);
-    } else {
-        pages.push(0);
-        if (current > 2) pages.push('...');
-        for (let i = Math.max(1, current - 1); i <= Math.min(maxPage - 1, current + 1); i++) {
-            pages.push(i);
-        }
-        if (current < maxPage - 2) pages.push('...');
-        pages.push(maxPage);
-    }
-
-    pages.forEach(p => {
-        if (p === '...') {
-            const span = document.createElement('span');
-            span.className = 'page-ellipsis';
-            span.textContent = '...';
-            bar.appendChild(span);
-        } else {
-            const btn = document.createElement('button');
-            btn.className = 'page-btn' + (p === current ? ' active' : '');
-            btn.textContent = p + 1;
-            btn.onclick = () => goToPage(p);
-            bar.appendChild(btn);
-        }
-    });
-
-    /* Next button */
-    const next = document.createElement('button');
-    next.className = 'page-btn';
-    next.innerHTML = '&raquo;';
-    next.disabled = current >= maxPage;
-    next.onclick = () => goToPage(current + 1);
-    bar.appendChild(next);
-
-    /* Page info */
-    const info = document.createElement('span');
-    info.className = 'page-info';
-    info.textContent = `${total} total`;
-    bar.appendChild(info);
-
-    /* Go to page */
-    if (totalPages > 1) {
-        const gotoDiv = document.createElement('div');
-        gotoDiv.className = 'page-goto';
-        gotoDiv.innerHTML = `<span style="font-size:.8rem;color:#666;">Go to</span>
-            <input type="number" min="1" max="${totalPages}" placeholder="${current+1}" />`;
-        const input = gotoDiv.querySelector('input');
-        const doGoto = () => {
-            const v = parseInt(input.value);
-            if (v >= 1 && v <= totalPages) goToPage(v - 1);
-        };
-        input.addEventListener('keydown', e => { if (e.key === 'Enter') doGoto(); });
-        bar.appendChild(gotoDiv);
-    }
+function closeDrawer() { drawerMount.innerHTML = ""; state.selected = null; renderRows(); }
+function section(title, body) { return `<section class="d-section"><h5>${escapeHtml(title)}</h5>${body}</section>`; }
+function kvTable(obj) { return `<div class="kv">${Object.entries(obj || {}).map(([k,v]) => typeof v === "object" ? "" : `<div class="k">${escapeHtml(k.replaceAll("_", " "))}</div><div class="v">${escapeHtml(v)}</div>`).join("")}</div>`; }
+function headersTable(obj) { return `<table class="headers-table"><tbody>${Object.entries(obj).map(([k,v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join("")}</tbody></table>`; }
+function rawPreview(hex) {
+  if (!hex) return "(no raw bytes)";
+  const bytes = [];
+  for (let i = 0; i < hex.length; i += 2) bytes.push(parseInt(hex.slice(i, i + 2), 16));
+  return new TextDecoder("utf-8", { fatal: false }).decode(new Uint8Array(bytes)).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ".");
 }
 
-/* Enter key triggers search */
-document.getElementById('searchInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') applyFilters();
-});
+function renderSavedSearches() {
+  const items = savedSearches();
+  savedSearchesEl = document.getElementById("savedSearches");
+  savedSearchesEl.innerHTML = items.length ? items.map((s, i) => `<button class="side-item" type="button" data-saved="${i}"><span>${escapeHtml(s.name)}</span><span class="badge">${escapeHtml(s.protocol || "all")}</span></button>`).join("") : `<div class="side-item dim"><span>none saved</span><span></span></div>`;
+  savedSearchesEl.querySelectorAll("[data-saved]").forEach(btn => btn.onclick = () => {
+    const item = savedSearches()[Number(btn.dataset.saved)];
+    state.proto = item.protocol || ""; state.search = item.search || ""; state.page = 0;
+    protoFilter.value = state.proto; searchInput.value = state.search; loadRequests();
+  });
+}
+function saveCurrentSearch() {
+  const name = prompt("Save search as:");
+  if (!name) return;
+  const items = savedSearches().filter(s => s.name !== name);
+  items.unshift({ name, protocol: state.proto, search: searchInput.value.trim() || state.search });
+  setSavedSearches(items.slice(0, 8));
+}
+function applyQuick(name) {
+  const presets = {
+    all: { proto: "", search: "" },
+    creds: { proto: "", search: "password" },
+    post: { proto: "HTTP", search: "POST" },
+    failed: { proto: "LDAP", search: "failed" },
+  };
+  const p = presets[name] || presets.all;
+  state.proto = p.proto; state.search = p.search; state.page = 0;
+  protoFilter.value = state.proto; searchInput.value = state.search; loadRequests();
+}
+function clearFilters() { state.proto = ""; state.search = ""; state.page = 0; protoFilter.value = ""; searchInput.value = ""; loadRequests(); }
 
-/* ── WebSocket live feed ─────────────────────────────────────────── */
+async function loadBlockedIps() {
+  const data = await fetchJson("/api/blocked-ips");
+  const ips = (data && data.blocked_ips) || [];
+  blockedList.innerHTML = ips.length ? ips.map(ip => `<button class="side-item" type="button" data-unblock="${escapeHtml(ip.ip)}"><span>${escapeHtml(ip.ip)}</span><span class="badge">unblock</span></button>`).join("") : `<div class="side-item dim"><span>none</span><span></span></div>`;
+  blockedList.querySelectorAll("[data-unblock]").forEach(btn => btn.onclick = () => unblockIp(btn.dataset.unblock));
+}
+async function blockIp(ip) { if (!ip) return; await fetch("/api/blocked-ips", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ip }) }); closeDrawer(); loadBlockedIps(); loadRequests(); }
+async function unblockIp(ip) { await fetch(`/api/blocked-ips/${encodeURIComponent(ip)}`, { method: "DELETE" }); loadBlockedIps(); loadRequests(); }
+async function deleteSelected() { if (!state.selected || !confirm("Delete this request?")) return; await fetch(`/api/requests/${encodeURIComponent(state.selected.id)}`, { method: "DELETE" }); closeDrawer(); loadRequests(); loadStats(); }
+function exportSelected() { if (state.selected) downloadJson(`pega-request-${state.selected.id}.json`, state.selected); }
+async function copyCurl() {
+  if (!state.selected) return;
+  const d = state.selected.details || {};
+  const host = d.host || state.selected.subdomain || location.host;
+  const path = d.path || "/";
+  await navigator.clipboard.writeText(`curl -i '${location.protocol}//${host}${path}'`);
+}
+async function clearLog() { if (!confirm("Delete all captured requests?")) return; await fetch("/api/requests", { method: "DELETE" }); closeDrawer(); loadRequests(); loadStats(); }
+
 function connectWS() {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${proto}//${location.host}/ws`);
-
-    ws.onopen = () => {
-        document.getElementById('wsDot').className = 'ws-dot connected';
-        document.getElementById('wsLabel').textContent = 'Live';
-    };
-    ws.onclose = () => {
-        document.getElementById('wsDot').className = 'ws-dot disconnected';
-        document.getElementById('wsLabel').textContent = 'Disconnected';
-        /* Auto-reconnect after 3 seconds */
-        setTimeout(connectWS, 3000);
-    };
-    ws.onerror = () => {
-        document.getElementById('wsDot').className = 'ws-dot disconnected';
-        document.getElementById('wsLabel').textContent = 'Error';
-    };
-    ws.onmessage = (event) => {
-        try {
-            const r = JSON.parse(event.data);
-            /* Only prepend if we are on the first page with no filters */
-            if (currentPage === 0 && !currentProto && !currentSearch) {
-                const tbody = document.getElementById('reqBody');
-                const tr = buildRow(r);
-                tr.classList.add('new-row');
-                tbody.insertBefore(tr, tbody.firstChild);
-                /* Keep table size reasonable */
-                while (tbody.children.length > PAGE_SIZE + 20) {
-                    tbody.removeChild(tbody.lastChild);
-                }
-            }
-            /* Always refresh stats on new event */
-            loadStats();
-        } catch (e) {
-            console.error('WS message parse error', e);
-        }
-    };
-}
-
-/* ── Settings Panel ──────────────────────────────────────────────── */
-let settingsLoaded = false;
-
-function toggleSettings() {
-    const panel = document.getElementById('settingsPanel');
-    const overlay = document.getElementById('settingsOverlay');
-    const isActive = panel.classList.contains('active');
-    if (isActive) {
-        panel.classList.remove('active');
-        overlay.classList.remove('active');
-    } else {
-        panel.classList.add('active');
-        overlay.classList.add('active');
-        if (!settingsLoaded) loadConfig();
-    }
-}
-
-async function loadConfig() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+  ws.onopen = () => { wsDot.style.background = "var(--ok)"; wsLabel.textContent = state.paused ? "Paused" : "Live"; };
+  ws.onclose = () => { wsDot.style.background = "var(--warn)"; wsLabel.textContent = "Disconnected"; setTimeout(connectWS, 3000); };
+  ws.onerror = () => { wsDot.style.background = "var(--warn)"; wsLabel.textContent = "Error"; };
+  ws.onmessage = event => {
+    if (state.paused) return;
     try {
-        const resp = await fetch('/api/config');
-        if (!resp.ok) return;
-        const cfg = await resp.json();
-        document.getElementById('cfgDomain').value = cfg.domain || '';
-        document.getElementById('cfgResponseIp').value = cfg.response_ip || '';
-        document.getElementById('cfgBindIp').value = cfg.bind_ip || '';
-        document.getElementById('cfgDashboardPort').value = cfg.dashboard_port || '';
-
-        document.getElementById('cfgPassword').value = '';
-        document.getElementById('passwordHint').textContent = cfg.password_set
-            ? 'Password is set. Leave blank to keep current.'
-            : 'No password set. Dashboard is public.';
-
-        const container = document.getElementById('protocolToggles');
-        container.innerHTML = '';
-        for (const [name, proto] of Object.entries(cfg.protocols || {})) {
-            const upper = name.toUpperCase();
-            const c = PROTO_COLORS[upper] || { bg:'#333', fg:'#aaa' };
-            const extras = (proto.extra_ports || []).join(', ');
-            const allPorts = extras ? `${proto.port}, ${extras}` : `${proto.port}`;
-            const row = document.createElement('div');
-            row.className = 'proto-toggle';
-            row.innerHTML = `
-                <div class="proto-toggle-label">
-                    <span class="proto-badge" style="background:${c.bg};color:${c.fg};min-width:70px;">${escapeHtml(upper)}</span>
-                    <span class="proto-toggle-port">:${escapeHtml(allPorts)}</span>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" data-proto="${escapeHtml(name)}" ${proto.enabled ? 'checked' : ''} />
-                    <span class="toggle-slider"></span>
-                </label>`;
-            if (extras) {
-                const portsInput = document.createElement('div');
-                portsInput.style.cssText = 'width:100%;margin-top:4px;';
-                portsInput.innerHTML = `<input type="text" data-extra-ports="${escapeHtml(name)}" value="${escapeHtml(extras)}"
-                    placeholder="Extra ports (comma-separated)"
-                    style="width:100%;background:#1a1a2e;color:#d0d0d0;border:1px solid #333;padding:4px 8px;border-radius:4px;font-size:.75rem;outline:none;" />`;
-                row.appendChild(portsInput);
-            }
-            container.appendChild(row);
-        }
-
-        document.getElementById('currentVersion').textContent = 'v' + (cfg._version || '?');
-
-        /* Let's Encrypt config */
-        const le = cfg.letsencrypt || {};
-        document.getElementById('cfgLeEnabled').checked = !!le.enabled;
-        document.getElementById('cfgLeEmail').value = le.email || '';
-
-        /* Load LE cert status */
-        loadLeStatus();
-
-        /* Show logout button if password is set */
-        if (cfg.password_set) {
-            document.getElementById('logoutBtn').style.display = '';
-        }
-
-        settingsLoaded = true;
-    } catch (e) { console.error('Config load error', e); }
+      const req = JSON.parse(event.data);
+      state.stream.unshift(req); state.stream = state.stream.slice(0, 120); renderStream();
+      state.recentEvents.unshift(req); state.recentEvents = state.recentEvents.slice(0, 1000);
+      if (state.page === 0 && !state.proto && !state.search) {
+        state.rows.unshift(req); state.rows = state.rows.slice(0, PAGE_SIZE); state.total += 1; renderRows(new Set([req.id]));
+      } else {
+        loadRequests();
+      }
+      loadStats();
+    } catch (e) { console.error(e); }
+  };
+}
+function togglePause() {
+  state.paused = !state.paused;
+  pauseBtn.textContent = state.paused ? "Resume" : "Pause";
+  wsLabel.textContent = state.paused ? "Paused" : "Live";
+  streamState.textContent = state.paused ? "PAUSED" : "STREAMING";
+}
+function renderStream() {
+  streamBody.innerHTML = state.stream.map(r => `<div class="stream-line" style="--p-c:${protoVar(r.protocol)}"><div class="t">${escapeHtml(formatTime(r.timestamp))}</div><div class="p">${escapeHtml(shortProto(r.protocol))}</div><div class="msg"><span class="glyph">&gt;</span>${summaryHtml(r.summary || "")}</div></div>`).join("");
+  streamCount.textContent = `${state.stream.length} captured`;
 }
 
-async function loadLeStatus() {
-    try {
-        const resp = await fetch('/api/letsencrypt/status');
-        if (!resp.ok) return;
-        const st = await resp.json();
-        const info = document.getElementById('leCertInfo');
-        let html = '';
-        if (!st.certbot_available) {
-            html = '<span style="color:#ff1744;">certbot not installed</span>';
-        } else if (st.certificate_exists) {
-            const expiry = st.expiry ? new Date(st.expiry).toLocaleDateString() : '?';
-            html = `<span style="color:#00e676;">Certificate active for ${escapeHtml(st.domain)}</span> &mdash; expires ${expiry}`;
-        } else {
-            html = '<span style="color:#888;">No certificate yet</span>';
-        }
-        info.innerHTML = html;
-    } catch (e) { console.error('LE status error', e); }
+async function loadConfig(silent) {
+  const cfg = await fetchJson("/api/config", silent);
+  if (!cfg) return;
+  cfgDomain.value = cfg.domain || "";
+  cfgResponseIp.value = cfg.response_ip || "";
+  cfgBindIp.value = cfg.bind_ip || "";
+  cfgDashboardPort.value = cfg.dashboard_port || "";
+  currentVersion.textContent = "v" + (cfg._version || "?");
+  cfgLeEnabled.checked = !!(cfg.letsencrypt && cfg.letsencrypt.enabled);
+  cfgLeEmail.value = (cfg.letsencrypt && cfg.letsencrypt.email) || "";
+  logoutBtn.style.display = cfg.password_set ? "" : "none";
+  protocolToggles.innerHTML = Object.entries(cfg.protocols || {}).map(([name, proto]) => `<label class="settings-row"><span><span class="p-tag" style="--p-c:${protoVar(name.toUpperCase())}">${escapeHtml(name.toUpperCase())}</span><span class="dim"> :${escapeHtml(proto.port || "")}</span></span><input type="checkbox" data-proto="${escapeHtml(name)}" ${proto.enabled ? "checked" : ""}></label>`).join("");
+  loadLeStatus();
 }
-
+function openSettings() { settingsScrim.hidden = false; settingsDrawer.hidden = false; loadConfig(true); }
+function closeSettings() { settingsScrim.hidden = true; settingsDrawer.hidden = true; }
 async function saveConfig() {
-    const statusEl = document.getElementById('saveStatus');
-    statusEl.textContent = 'Saving...';
-    statusEl.className = 'settings-status';
-
-    const config = {
-        domain: document.getElementById('cfgDomain').value,
-        response_ip: document.getElementById('cfgResponseIp').value,
-        bind_ip: document.getElementById('cfgBindIp').value,
-        dashboard_port: parseInt(document.getElementById('cfgDashboardPort').value) || 8443,
-        letsencrypt: {
-            enabled: document.getElementById('cfgLeEnabled').checked,
-            email: document.getElementById('cfgLeEmail').value,
-            agree_tos: document.getElementById('cfgLeEnabled').checked,
-        },
-        protocols: {},
-    };
-
-    const pw = document.getElementById('cfgPassword').value;
-    if (pw !== '') {
-        config.dashboard_password = pw;
-    }
-    document.querySelectorAll('#protocolToggles input[type="checkbox"]').forEach(cb => {
-        const name = cb.dataset.proto;
-        config.protocols[name] = { enabled: cb.checked };
-        const portsInput = document.querySelector(`input[data-extra-ports="${name}"]`);
-        if (portsInput && portsInput.value.trim()) {
-            config.protocols[name].extra_ports = portsInput.value.split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p));
-        }
-    });
-
-    try {
-        const resp = await fetch('/api/config', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config),
-        });
-        const data = await resp.json();
-        if (resp.ok) {
-            statusEl.textContent = data.message || 'Saved!';
-            statusEl.className = 'settings-status success';
-            if (data.restarting) {
-                waitForRestart();
-            }
-        } else {
-            statusEl.textContent = data.error || 'Save failed';
-            statusEl.className = 'settings-status error';
-        }
-    } catch (e) {
-        statusEl.textContent = 'Network error';
-        statusEl.className = 'settings-status error';
-    }
+  saveStatus.textContent = "Saving...";
+  const body = { domain: cfgDomain.value, response_ip: cfgResponseIp.value, bind_ip: cfgBindIp.value, dashboard_port: Number(cfgDashboardPort.value) || 8443, letsencrypt: { enabled: cfgLeEnabled.checked, email: cfgLeEmail.value, agree_tos: cfgLeEnabled.checked }, protocols: {} };
+  if (cfgPassword.value) body.dashboard_password = cfgPassword.value;
+  protocolToggles.querySelectorAll("input[data-proto]").forEach(cb => body.protocols[cb.dataset.proto] = { enabled: cb.checked });
+  const resp = await fetch("/api/config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  saveStatus.textContent = resp.ok ? "Saved" : "Save failed";
 }
-
-function waitForRestart() {
-    const statusEl = document.getElementById('saveStatus');
-    let attempts = 0;
-    const check = setInterval(async () => {
-        attempts++;
-        statusEl.textContent = `Restarting... (${attempts})`;
-        try {
-            const r = await fetch('/api/stats');
-            if (r.ok) {
-                clearInterval(check);
-                statusEl.textContent = 'Restarted! Reloading...';
-                statusEl.className = 'settings-status success';
-                setTimeout(() => window.location.reload(), 500);
-            }
-        } catch (e) { /* still restarting */ }
-        if (attempts > 30) {
-            clearInterval(check);
-            statusEl.textContent = 'Restart taking too long — reload manually';
-            statusEl.className = 'settings-status error';
-        }
-    }, 2000);
+async function loadLeStatus() {
+  const st = await fetchJson("/api/letsencrypt/status", true);
+  if (!st) return;
+  leCertInfo.textContent = st.certificate_exists ? `Certificate active for ${st.domain}` : (st.certbot_available ? "No certificate yet" : "certbot not installed");
 }
-
-async function triggerUpdate() {
-    const btn = document.getElementById('btnUpdate');
-    const statusEl = document.getElementById('updateStatus');
-    btn.disabled = true;
-    btn.textContent = 'Updating...';
-    statusEl.textContent = 'Checking for updates...';
-    statusEl.className = 'settings-status';
-
-    try {
-        const resp = await fetch('/api/update', { method: 'POST' });
-        const data = await resp.json();
-        if (resp.ok) {
-            statusEl.textContent = data.message;
-            statusEl.className = 'settings-status success';
-            if (data.restarted) {
-                statusEl.textContent += ' — reloading...';
-                setTimeout(() => { window.location.reload(); }, 5000);
-            }
-        } else {
-            statusEl.textContent = data.error || 'Update failed';
-            statusEl.className = 'settings-status error';
-        }
-    } catch (e) {
-        statusEl.textContent = 'Network error — service may be restarting';
-        statusEl.className = 'settings-status error';
-        setTimeout(() => { window.location.reload(); }, 5000);
-    }
-    btn.disabled = false;
-    btn.textContent = 'Check for Updates';
-}
-
-/* ── Let's Encrypt cert request ──────────────────────────────────── */
 async function requestLeCert() {
-    const btn = document.getElementById('btnLeCert');
-    const statusEl = document.getElementById('leStatus');
-    const email = document.getElementById('cfgLeEmail').value.trim();
-
-    if (!email) {
-        statusEl.textContent = 'Email is required';
-        statusEl.className = 'settings-status error';
-        return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Requesting...';
-    statusEl.textContent = 'Running certbot (this may take a minute)...';
-    statusEl.className = 'settings-status';
-
-    try {
-        const resp = await fetch('/api/letsencrypt/obtain', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email }),
-        });
-        const data = await resp.json();
-        if (resp.ok) {
-            statusEl.textContent = data.message;
-            statusEl.className = 'settings-status success';
-            loadLeStatus();
-        } else {
-            statusEl.textContent = data.error || 'Request failed';
-            statusEl.className = 'settings-status error';
-        }
-    } catch (e) {
-        statusEl.textContent = 'Network error';
-        statusEl.className = 'settings-status error';
-    }
-    btn.disabled = false;
-    btn.textContent = 'Request Certificate';
+  leStatus.textContent = "Requesting...";
+  const resp = await fetch("/api/letsencrypt/request", { method: "POST" });
+  const data = await resp.json().catch(() => ({}));
+  leStatus.textContent = resp.ok ? (data.message || "Requested") : (data.error || "Request failed");
+  loadLeStatus();
 }
-
-/* ── Action menu ─────────────────────────────────────────────────── */
-function toggleActionMenu(btn) {
-    const menu = btn.nextElementSibling;
-    /* Close any other open menus */
-    document.querySelectorAll('.action-menu.open').forEach(m => {
-        if (m !== menu) m.classList.remove('open');
-    });
-    if (menu.classList.contains('open')) {
-        menu.classList.remove('open');
-        return;
-    }
-    /* Position using fixed coords so it's never clipped */
-    const rect = btn.getBoundingClientRect();
-    menu.style.top = (rect.bottom + 4) + 'px';
-    menu.style.right = (window.innerWidth - rect.right) + 'px';
-    menu.style.left = 'auto';
-    menu.classList.add('open');
+async function triggerUpdate() {
+  updateStatus.textContent = "Checking...";
+  const resp = await fetch("/api/update", { method: "POST" });
+  const data = await resp.json().catch(() => ({}));
+  updateStatus.textContent = data.message || data.error || (resp.ok ? "Done" : "Failed");
 }
-/* Close menus on click outside */
-document.addEventListener('click', () => {
-    document.querySelectorAll('.action-menu.open').forEach(m => m.classList.remove('open'));
-});
-
-async function deleteRequest(id) {
-    if (!confirm('Delete this request?')) return;
-    try {
-        const resp = await fetch(`/api/requests/${id}`, { method: 'DELETE' });
-        if (resp.ok) {
-            loadRequests();
-            loadStats();
-        }
-    } catch (e) { console.error('Delete error', e); }
+async function doLogout() { await fetch("/api/auth/logout", { method: "POST" }); location.href = "/login"; }
+async function fetchJson(url, silent) {
+  try {
+    const resp = await fetch(url);
+    if (resp.status === 401) { location.href = "/login"; return null; }
+    if (!resp.ok) throw new Error(resp.statusText);
+    return await resp.json();
+  } catch (e) { if (!silent) console.error(e); return null; }
 }
-
-async function blockIp(ip) {
-    if (!confirm(`Block all requests from ${ip}? Existing and future requests from this IP will be hidden.`)) return;
-    try {
-        const resp = await fetch('/api/blocked-ips', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ip }),
-        });
-        if (resp.ok) {
-            loadRequests();
-            loadStats();
-        }
-    } catch (e) { console.error('Block error', e); }
-}
-
-async function clearLog() {
-    if (!confirm('Delete ALL captured requests? This cannot be undone.')) return;
-    try {
-        const resp = await fetch('/api/requests', { method: 'DELETE' });
-        if (resp.ok) {
-            currentPage = 0;
-            loadRequests();
-            loadStats();
-        }
-    } catch (e) { console.error('Clear log error', e); }
-}
-
-/* ── Logout ──────────────────────────────────────────────────────── */
-async function doLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/login';
-}
-
-/* ── Initial load ────────────────────────────────────────────────── */
-loadStats();
-loadRequests();
-connectWS();
+function escapeJs(str) { return String(str).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
+init();
 </script>
 </body>
 </html>

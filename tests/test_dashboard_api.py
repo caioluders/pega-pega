@@ -78,6 +78,15 @@ async def test_list_requests_search(client, store, sample_request):
     assert len(resp.json()["requests"]) == 1
 
 
+async def test_list_requests_search_total_matches_results(client, store):
+    await store.save(CapturedRequest(id="match", summary="GET /admin"))
+    await store.save(CapturedRequest(id="skip", summary="GET /health"))
+    resp = await client.get("/api/requests?search=admin")
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["requests"][0]["id"] == "match"
+
+
 async def test_list_requests_pagination(client, store):
     for i in range(5):
         await store.save(CapturedRequest(id=f"p{i}"))

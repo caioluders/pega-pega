@@ -5,613 +5,333 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PEGA-PEGA Mock Rules</title>
 <link rel="stylesheet" href="/static/style.css">
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 14px; }
-body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    background: #0d0d1a;
-    color: #d0d0d0;
-    min-height: 100vh;
-}
-a { color: #7ec8e3; text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-/* ── Header ───────────────────────────────────────────────────────── */
-.header {
-    background: linear-gradient(135deg, #0d0d1a 0%, #16213e 100%);
-    border-bottom: 1px solid #1a1a3e;
-    padding: 12px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-.header-left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-.logo {
-    font-size: 1.3rem;
-    font-weight: 700;
-    letter-spacing: 2px;
-    color: #7ec8e3;
-}
-.nav-links { display: flex; gap: 16px; align-items: center; }
-.nav-links a {
-    color: #8888aa;
-    font-size: .85rem;
-    padding: 4px 10px;
-    border-radius: 4px;
-    transition: background .2s, color .2s;
-}
-.nav-links a:hover, .nav-links a.active {
-    background: #1a1a3e;
-    color: #7ec8e3;
-    text-decoration: none;
-}
-
-/* ── Buttons ──────────────────────────────────────────────────────── */
-.btn {
-    padding: 6px 14px;
-    border-radius: 6px;
-    border: 1px solid #2a2a4a;
-    background: #12122a;
-    color: #7ec8e3;
-    cursor: pointer;
-    font-size: .85rem;
-    transition: background .2s;
-}
-.btn:hover { background: #1a1a3e; }
-.btn-primary { background: #1a3a5c; border-color: #2a4a7c; font-weight: 600; }
-.btn-primary:hover { background: #224a6c; }
-.btn-danger { background: #5c1a1a; border-color: #7c2a2a; color: #ef9a9a; }
-.btn-danger:hover { background: #6c2424; }
-.btn-sm { padding: 3px 8px; font-size: .75rem; }
-
-/* ── Method badge ─────────────────────────────────────────────────── */
-.method-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: .75rem;
-    font-weight: 700;
-    min-width: 50px;
-    text-align: center;
-}
-.method-GET { background: #1b5e20; color: #a5d6a7; }
-.method-POST { background: #e65100; color: #ffcc80; }
-.method-PUT { background: #1565c0; color: #90caf9; }
-.method-PATCH { background: #6a1b9a; color: #ce93d8; }
-.method-DELETE { background: #b71c1c; color: #ef9a9a; }
-.method-ANY { background: #37474f; color: #b0bec5; }
-
-/* ── Status badge ─────────────────────────────────────────────────── */
-.status-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: .75rem;
-    font-weight: 600;
-    font-family: monospace;
-}
-.status-2xx { background: #1b5e20; color: #a5d6a7; }
-.status-3xx { background: #1565c0; color: #90caf9; }
-.status-4xx { background: #e65100; color: #ffcc80; }
-.status-5xx { background: #b71c1c; color: #ef9a9a; }
-
-/* ── Rules list ───────────────────────────────────────────────────── */
-.content { max-width: 1000px; margin: 0 auto; padding: 24px; }
-.rules-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-}
-.rules-header h2 { font-size: 1.1rem; color: #d0d0d0; }
-.empty-state {
-    text-align: center;
-    color: #555;
-    padding: 48px 16px;
-    border: 1px dashed #2a2a4a;
-    border-radius: 8px;
-}
-
-.rule-card {
-    background: #12122a;
-    border: 1px solid #1a1a3e;
-    border-radius: 8px;
-    padding: 14px 18px;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    cursor: grab;
-    transition: border-color .2s, opacity .2s;
-}
-.rule-card:hover { border-color: #2a4a7c; }
-.rule-card.dragging { opacity: 0.4; }
-.rule-card.drag-over { border-color: #7ec8e3; border-style: dashed; }
-.rule-card.disabled { opacity: 0.45; }
-
-.drag-handle {
-    color: #444;
-    font-size: 1.1rem;
-    cursor: grab;
-    user-select: none;
-}
-.rule-info { flex: 1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.rule-path {
-    font-family: monospace;
-    color: #7ec8e3;
-    font-size: .9rem;
-    word-break: break-all;
-}
-.rule-actions { display: flex; gap: 6px; align-items: center; }
-
-/* ── Toggle switch ────────────────────────────────────────────────── */
-.toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
-.toggle-switch input { opacity: 0; width: 0; height: 0; }
-.toggle-slider {
-    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-    background: #333; border-radius: 20px; transition: .3s;
-}
-.toggle-slider::before {
-    content: ''; position: absolute; height: 14px; width: 14px;
-    left: 3px; bottom: 3px; background: #888; border-radius: 50%; transition: .3s;
-}
-input:checked + .toggle-slider { background: #1a5a3a; }
-input:checked + .toggle-slider::before { transform: translateX(16px); background: #4caf50; }
-
-/* ── Modal ────────────────────────────────────────────────────────── */
-.modal-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.7); z-index: 100;
-    display: none; align-items: center; justify-content: center;
-}
-.modal-overlay.show { display: flex; }
-.modal {
-    background: #12122a;
-    border: 1px solid #1a1a3e;
-    border-radius: 12px;
-    width: 560px;
-    max-width: 95vw;
-    max-height: 90vh;
-    overflow-y: auto;
-    padding: 24px;
-}
-.modal h3 { font-size: 1.1rem; margin-bottom: 16px; color: #d0d0d0; }
-.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-
-.form-field { margin-bottom: 14px; }
-.form-field label {
-    display: block;
-    font-size: .8rem;
-    color: #888;
-    margin-bottom: 4px;
-}
-.form-field input, .form-field select, .form-field textarea {
-    width: 100%;
-    padding: 8px 12px;
-    background: #0d0d1a;
-    border: 1px solid #2a2a4a;
-    border-radius: 6px;
-    color: #d0d0d0;
-    font-size: .9rem;
-    font-family: inherit;
-    outline: none;
-}
-.form-field input:focus, .form-field select:focus, .form-field textarea:focus {
-    border-color: #7ec8e3;
-}
-.form-field textarea {
-    font-family: 'Fira Code', 'Cascadia Code', monospace;
-    min-height: 100px;
-    resize: vertical;
-}
-.form-row { display: flex; gap: 12px; }
-.form-row .form-field { flex: 1; }
-
-.form-field select { appearance: none; cursor: pointer; }
-
-.headers-list { margin-top: 4px; }
-.header-row {
-    display: flex; gap: 6px; margin-bottom: 4px; align-items: center;
-}
-.header-row input { flex: 1; }
-.header-row .btn-sm { flex-shrink: 0; }
-
-.status-msg {
-    font-size: .8rem;
-    margin-top: 8px;
-}
-.status-msg.error { color: #e74c3c; }
-.status-msg.success { color: #4caf50; }
-.file-active { color: #4caf50; font-weight: 600; }
-</style>
 </head>
 <body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><span class="slash">||</span> PEGA<span class="slash">/</span>PEGA</div>
+      <div class="brand-tagline">// custom HTTP responses</div>
+    </div>
+    <nav class="nav">
+      <a href="/">Dashboard</a>
+      <a href="/mock" aria-current="page">Mock Rules</a>
+      <a href="/?settings=1">Settings</a>
+    </nav>
+    <div class="top-right">
+      <button class="theme-toggle" type="button" id="themeToggle">Dark</button>
+      <button class="theme-toggle" type="button" id="logoutBtn" style="display:none;">Logout</button>
+    </div>
+  </header>
 
-<!-- ── Header ─────────────────────────────────────────────────────── -->
-<div class="header">
-    <div class="header-left">
-        <span class="logo">PEGA-PEGA</span>
-        <div class="nav-links">
-            <a href="/">Dashboard</a>
-            <a href="/mock" class="active">Mock Rules</a>
-        </div>
+  <main class="page">
+    <pre class="ascii-divider">/// MOCK ENDPOINTS ---------------------------------------------------</pre>
+    <h1>Mock HTTP Endpoints</h1>
+    <p class="subtitle">// define custom responses - first match wins - drag to reorder</p>
+
+    <div class="mock-toolbar">
+      <div class="search mock-search"><span>FIND</span><input id="ruleSearch" placeholder="path, method, status, content type..."><span id="ruleMatchHint">0/0</span></div>
+      <button type="button" data-variant="primary" id="addRuleBtn">Add rule</button>
+      <button type="button" id="importBtn">Import</button>
+      <button type="button" id="exportBtn">Export</button>
+      <input type="file" id="importFile" accept="application/json" hidden>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;">
-        <button class="btn" id="logoutBtn" onclick="doLogout()" style="display:none;">&#x2190; Logout</button>
+
+    <div class="ruleset" id="rulesList"></div>
+    <div class="mock-footer">
+      <div id="rulesSummary">0 active / 0 total</div>
+      <div>priority: top to bottom</div>
     </div>
+  </main>
 </div>
 
-<!-- ── Content ────────────────────────────────────────────────────── -->
-<div class="content">
-    <div class="rules-header">
-        <h2>Mock HTTP Endpoints</h2>
-        <button class="btn btn-primary" onclick="openModal()">+ Add Rule</button>
-    </div>
-    <div id="rulesList"></div>
-</div>
-
-<!-- ── Add/Edit Modal ─────────────────────────────────────────────── -->
-<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-    <div class="modal">
-        <h3 id="modalTitle">Add Mock Rule</h3>
-        <input type="hidden" id="editId" value="">
-        <div class="form-field">
-            <label for="fPath">Path Pattern</label>
-            <input type="text" id="fPath" placeholder="/api/users/:id" />
+<div class="drawer-scrim" id="modalScrim" hidden></div>
+<aside class="drawer" id="ruleDrawer" hidden>
+  <div class="drawer-head">
+    <div><div class="eyebrow">MOCK RULE</div><h2 id="modalTitle">Add rule</h2></div>
+    <button class="x" type="button" id="closeModal" aria-label="Close">x</button>
+  </div>
+  <div class="drawer-body">
+    <section class="d-section">
+      <h5>Matcher</h5>
+      <input type="hidden" id="editId">
+      <div class="settings-form">
+        <label>Path pattern<input id="fPath" placeholder="/api/users/:id"></label>
+        <div class="form-grid">
+          <label>Method<select id="fMethod"><option>ANY</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></label>
+          <label>Status code<input id="fStatus" type="number" min="100" max="599" value="200"></label>
+          <label>Content-Type<select id="fContentType">
+            <option value="application/json">application/json</option>
+            <option value="text/html">text/html</option>
+            <option value="text/plain">text/plain</option>
+            <option value="application/xml">application/xml</option>
+            <option value="image/png">image/png</option>
+            <option value="image/jpeg">image/jpeg</option>
+            <option value="image/gif">image/gif</option>
+            <option value="image/svg+xml">image/svg+xml</option>
+            <option value="application/pdf">application/pdf</option>
+            <option value="application/octet-stream">application/octet-stream</option>
+          </select></label>
         </div>
-        <div class="form-row">
-            <div class="form-field">
-                <label for="fMethod">Method</label>
-                <select id="fMethod">
-                    <option value="ANY">ANY</option>
-                    <option value="GET">GET</option>
-                    <option value="POST">POST</option>
-                    <option value="PUT">PUT</option>
-                    <option value="PATCH">PATCH</option>
-                    <option value="DELETE">DELETE</option>
-                </select>
-            </div>
-            <div class="form-field">
-                <label for="fStatus">Status Code</label>
-                <input type="number" id="fStatus" value="200" min="100" max="599" />
-            </div>
-            <div class="form-field">
-                <label for="fContentType">Content-Type</label>
-                <select id="fContentType">
-                    <option value="application/json">application/json</option>
-                    <option value="text/html">text/html</option>
-                    <option value="text/plain">text/plain</option>
-                    <option value="application/xml">application/xml</option>
-                    <option value="image/png">image/png</option>
-                    <option value="image/jpeg">image/jpeg</option>
-                    <option value="image/gif">image/gif</option>
-                    <option value="image/svg+xml">image/svg+xml</option>
-                    <option value="application/pdf">application/pdf</option>
-                    <option value="application/octet-stream">application/octet-stream</option>
-                </select>
-            </div>
-        </div>
-        <div class="form-field">
-            <label for="fBody">Response Body</label>
-            <textarea id="fBody" placeholder='{"message": "Hello from mock!"}'></textarea>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-                <button class="btn btn-sm" type="button" onclick="document.getElementById('fileUpload').click()">Upload File</button>
-                <input type="file" id="fileUpload" style="display:none" onchange="handleFileUpload(this)" />
-                <span id="fileInfo" style="font-size:.75rem;color:#666;"></span>
-                <button class="btn btn-sm btn-danger" id="btnClearFile" type="button" onclick="clearUploadedFile()" style="display:none;">Remove</button>
-            </div>
-            <input type="hidden" id="fResponseFile" value="" />
-        </div>
-        <div class="form-field">
-            <label>Response Headers <button class="btn btn-sm" type="button" onclick="addHeaderRow()">+ Add</button></label>
-            <div class="headers-list" id="headersList"></div>
-        </div>
-        <div id="formStatus" class="status-msg"></div>
-        <div class="modal-actions">
-            <button class="btn" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="saveRule()">Save Rule</button>
-        </div>
-    </div>
-</div>
+      </div>
+    </section>
+    <section class="d-section">
+      <h5>Response body</h5>
+      <textarea id="fBody" class="response-editor" placeholder='{"message": "Hello from mock!"}'></textarea>
+      <div class="drawer-actions inline-actions">
+        <button type="button" id="uploadBtn">Upload file</button>
+        <button type="button" id="clearFileBtn" data-danger="true" hidden>Remove file</button>
+        <span id="fileInfo" class="dim"></span>
+        <input type="file" id="fileUpload" hidden>
+        <input type="hidden" id="fResponseFile">
+      </div>
+    </section>
+    <section class="d-section">
+      <h5>Response headers</h5>
+      <div id="headersList" class="headers-list"></div>
+      <button type="button" id="addHeaderBtn">Add header</button>
+      <div id="formStatus" class="status-msg"></div>
+    </section>
+  </div>
+  <div class="drawer-foot">
+    <button type="button" id="cancelBtn">Cancel</button>
+    <button type="button" data-variant="primary" id="saveRuleBtn">Save rule</button>
+  </div>
+</aside>
 
 <script src="/static/app.js"></script>
 <script>
 let rules = [];
 let dragSrcIndex = null;
+let pendingFileData = null;
 
-/* ── Load rules ──────────────────────────────────────────────────── */
-async function loadRules() {
-    try {
-        const resp = await fetch('/api/mock-rules');
-        if (resp.status === 401) { window.location.href = '/login'; return; }
-        const data = await resp.json();
-        rules = data.rules || [];
-        renderRules();
-    } catch (e) { console.error('Load rules error', e); }
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("pega-theme", theme);
+  themeToggle.textContent = theme === "light" ? "Light" : "Dark";
+}
+function statusClass(code) { return `status-color-${String(code || 500).charAt(0)}`; }
+function methodClass(method) { return `method-color-${method || "ANY"}`; }
+function filteredRules() {
+  const q = ruleSearch.value.trim().toLowerCase();
+  if (!q) return rules;
+  return rules.filter(r => [r.path, r.method, r.status_code, r.content_type, r.response_body, r.response_file].some(v => String(v || "").toLowerCase().includes(q)));
 }
 
-function statusClass(code) {
-    if (code >= 200 && code < 300) return 'status-2xx';
-    if (code >= 300 && code < 400) return 'status-3xx';
-    if (code >= 400 && code < 500) return 'status-4xx';
-    return 'status-5xx';
+function bindEvents() {
+  themeToggle.onclick = () => applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
+  logoutBtn.onclick = doLogout;
+  ruleSearch.oninput = renderRules;
+  addRuleBtn.onclick = () => openModal();
+  importBtn.onclick = () => importFile.click();
+  exportBtn.onclick = exportRules;
+  importFile.onchange = importRules;
+  closeModal.onclick = closeRuleModal;
+  modalScrim.onclick = closeRuleModal;
+  cancelBtn.onclick = closeRuleModal;
+  saveRuleBtn.onclick = saveRule;
+  uploadBtn.onclick = () => fileUpload.click();
+  fileUpload.onchange = () => handleFileUpload(fileUpload);
+  clearFileBtn.onclick = clearUploadedFile;
+  addHeaderBtn.onclick = () => addHeaderRow();
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeRuleModal(); });
+}
+
+async function loadRules() {
+  const resp = await fetch("/api/mock-rules");
+  if (resp.status === 401) { location.href = "/login"; return; }
+  const data = await resp.json();
+  rules = data.rules || [];
+  renderRules();
 }
 
 function renderRules() {
-    const container = document.getElementById('rulesList');
-    if (rules.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No mock rules yet.</p><p style="margin-top:8px;font-size:.8rem;">Click "Add Rule" to create your first mock HTTP endpoint.</p></div>';
-        return;
-    }
-    container.innerHTML = rules.map((r, i) => `
-        <div class="rule-card ${r.enabled ? '' : 'disabled'}"
-             draggable="true"
-             data-index="${i}"
-             ondragstart="onDragStart(event, ${i})"
-             ondragover="onDragOver(event)"
-             ondragenter="onDragEnter(event)"
-             ondragleave="onDragLeave(event)"
-             ondrop="onDrop(event, ${i})"
-             ondragend="onDragEnd(event)">
-            <span class="drag-handle" title="Drag to reorder">&#x2630;</span>
-            <div class="rule-info">
-                <span class="method-badge method-${r.method}">${esc(r.method)}</span>
-                <span class="rule-path">${esc(r.path)}</span>
-                <span class="status-badge ${statusClass(r.status_code)}">${r.status_code}</span>
-                ${r.response_file ? '<span style="font-size:.7rem;color:#888;" title="File attached">&#128206;</span>' : ''}
-            </div>
-            <div class="rule-actions">
-                <label class="toggle-switch" title="Enable/Disable">
-                    <input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="toggleRule('${r.id}', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
-                <button class="btn btn-sm" onclick="editRule('${r.id}')" title="Edit">&#9998;</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteRule('${r.id}')" title="Delete">&#10005;</button>
-            </div>
-        </div>
-    `).join('');
+  const list = filteredRules();
+  ruleMatchHint.textContent = `${list.length}/${rules.length}`;
+  if (!rules.length) {
+    rulesList.innerHTML = `<div class="empty-log">/// no mock rules yet</div>`;
+  } else {
+    rulesList.innerHTML = `<div class="rule rule-head"><div></div><div>METHOD</div><div>PATH</div><div>STATUS</div><div>CONTENT</div><div>PRIORITY</div><div>ON</div><div></div></div>` + list.map((r) => {
+      const index = rules.findIndex(x => x.id === r.id);
+      return `<div class="rule" draggable="true" data-id="${escapeHtml(r.id)}" data-index="${index}" data-disabled="${!r.enabled}">
+        <div class="grip">=</div>
+        <div><span class="method ${methodClass(r.method)}">${escapeHtml(r.method)}</span></div>
+        <div class="path">${escapeHtml(r.path)} ${r.response_file ? `<span class="dim" title="file attached">file:${escapeHtml(r.response_file)}</span>` : ""}</div>
+        <div><span class="status ${statusClass(r.status_code)}">${escapeHtml(r.status_code)}</span></div>
+        <div class="ct">${escapeHtml(r.content_type || "")} · <span class="dim">${String(r.response_body || "").length}B</span></div>
+        <div class="hits">${escapeHtml(r.priority || 0)}</div>
+        <div><div class="toggle" data-on="${!!r.enabled}" data-toggle="${escapeHtml(r.id)}"></div></div>
+        <div class="controls"><button type="button" data-edit="${escapeHtml(r.id)}">Edit</button><button type="button" data-delete="${escapeHtml(r.id)}" data-danger="true">Delete</button></div>
+      </div>`;
+    }).join("");
+  }
+  rulesSummary.textContent = `${rules.filter(r => r.enabled).length} active / ${rules.length} total`;
+  rulesList.querySelectorAll("[data-toggle]").forEach(el => el.onclick = () => toggleRule(el.dataset.toggle));
+  rulesList.querySelectorAll("[data-edit]").forEach(btn => btn.onclick = () => editRule(btn.dataset.edit));
+  rulesList.querySelectorAll("[data-delete]").forEach(btn => btn.onclick = () => deleteRule(btn.dataset.delete));
+  rulesList.querySelectorAll(".rule[draggable='true']").forEach(row => {
+    row.ondragstart = e => { dragSrcIndex = Number(row.dataset.index); row.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; };
+    row.ondragover = e => { e.preventDefault(); row.classList.add("drag-over"); };
+    row.ondragleave = () => row.classList.remove("drag-over");
+    row.ondragend = () => document.querySelectorAll(".rule").forEach(el => el.classList.remove("dragging", "drag-over"));
+    row.ondrop = e => dropRule(e, Number(row.dataset.index));
+  });
 }
 
-function esc(s) { return escapeHtml(s); }
-
-/* ── Drag & drop reorder ─────────────────────────────────────────── */
-function onDragStart(e, index) {
-    dragSrcIndex = index;
-    e.currentTarget.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-}
-function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
-function onDragEnter(e) {
-    e.preventDefault();
-    e.currentTarget.classList.add('drag-over');
-}
-function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
-function onDragEnd(e) {
-    e.currentTarget.classList.remove('dragging');
-    document.querySelectorAll('.rule-card').forEach(c => c.classList.remove('drag-over'));
+async function dropRule(e, targetIndex) {
+  e.preventDefault();
+  if (dragSrcIndex === null || dragSrcIndex === targetIndex) return;
+  const moved = rules.splice(dragSrcIndex, 1)[0];
+  rules.splice(targetIndex, 0, moved);
+  rules.forEach((r, i) => r.priority = i);
+  renderRules();
+  await fetch("/api/mock-rules/reorder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: rules.map(r => r.id) }) });
+  dragSrcIndex = null;
 }
 
-async function onDrop(e, targetIndex) {
-    e.preventDefault();
-    e.currentTarget.classList.remove('drag-over');
-    if (dragSrcIndex === null || dragSrcIndex === targetIndex) return;
-
-    const moved = rules.splice(dragSrcIndex, 1)[0];
-    rules.splice(targetIndex, 0, moved);
-    renderRules();
-
-    const order = rules.map(r => r.id);
-    await fetch('/api/mock-rules/reorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order }),
-    });
-    dragSrcIndex = null;
+async function toggleRule(id) {
+  const rule = rules.find(r => r.id === id);
+  if (!rule) return;
+  await fetch(`/api/mock-rules/${encodeURIComponent(id)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: !rule.enabled }) });
+  loadRules();
 }
-
-/* ── Toggle enable ───────────────────────────────────────────────── */
-async function toggleRule(id, enabled) {
-    await fetch(`/api/mock-rules/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled }),
-    });
-    loadRules();
-}
-
-/* ── Delete ──────────────────────────────────────────────────────── */
 async function deleteRule(id) {
-    if (!confirm('Delete this mock rule?')) return;
-    await fetch(`/api/mock-rules/${id}`, { method: 'DELETE' });
-    loadRules();
+  if (!confirm("Delete this mock rule?")) return;
+  await fetch(`/api/mock-rules/${encodeURIComponent(id)}`, { method: "DELETE" });
+  loadRules();
 }
 
-/* ── Modal ────────────────────────────────────────────────────────── */
 function openModal(rule) {
-    document.getElementById('formStatus').textContent = '';
-    pendingFileData = null;
-    if (rule) {
-        document.getElementById('modalTitle').textContent = 'Edit Mock Rule';
-        document.getElementById('editId').value = rule.id;
-        document.getElementById('fPath').value = rule.path;
-        document.getElementById('fMethod').value = rule.method;
-        document.getElementById('fStatus').value = rule.status_code;
-        document.getElementById('fContentType').value = rule.content_type;
-        document.getElementById('fBody').value = rule.response_body;
-        document.getElementById('fResponseFile').value = rule.response_file || '';
-        if (rule.response_file) {
-            document.getElementById('fileInfo').innerHTML = `<span class="file-active">${esc(rule.response_file)}</span>`;
-            document.getElementById('btnClearFile').style.display = '';
-        } else {
-            document.getElementById('fileInfo').textContent = '';
-            document.getElementById('btnClearFile').style.display = 'none';
-        }
-        const hl = document.getElementById('headersList');
-        hl.innerHTML = '';
-        for (const [k, v] of Object.entries(rule.headers || {})) {
-            addHeaderRow(k, v);
-        }
-    } else {
-        document.getElementById('modalTitle').textContent = 'Add Mock Rule';
-        document.getElementById('editId').value = '';
-        document.getElementById('fPath').value = '';
-        document.getElementById('fMethod').value = 'ANY';
-        document.getElementById('fStatus').value = '200';
-        document.getElementById('fContentType').value = 'application/json';
-        document.getElementById('fBody').value = '';
-        document.getElementById('fResponseFile').value = '';
-        document.getElementById('fileInfo').textContent = '';
-        document.getElementById('btnClearFile').style.display = 'none';
-        document.getElementById('headersList').innerHTML = '';
-    }
-    document.getElementById('modalOverlay').classList.add('show');
+  pendingFileData = null;
+  formStatus.textContent = "";
+  modalTitle.textContent = rule ? "Edit rule" : "Add rule";
+  editId.value = rule ? rule.id : "";
+  fPath.value = rule ? rule.path : "";
+  fMethod.value = rule ? rule.method : "ANY";
+  fStatus.value = rule ? rule.status_code : 200;
+  fContentType.value = rule ? rule.content_type : "application/json";
+  fBody.value = rule ? rule.response_body : "";
+  fResponseFile.value = rule ? (rule.response_file || "") : "";
+  fileInfo.textContent = fResponseFile.value ? `file: ${fResponseFile.value}` : "";
+  clearFileBtn.hidden = !fResponseFile.value;
+  headersList.innerHTML = "";
+  Object.entries((rule && rule.headers) || {}).forEach(([k, v]) => addHeaderRow(k, v));
+  modalScrim.hidden = false;
+  ruleDrawer.hidden = false;
 }
-
-function closeModal() {
-    document.getElementById('modalOverlay').classList.remove('show');
+function closeRuleModal() { modalScrim.hidden = true; ruleDrawer.hidden = true; }
+function editRule(id) { const rule = rules.find(r => r.id === id); if (rule) openModal(rule); }
+function addHeaderRow(key = "", value = "") {
+  const row = document.createElement("div");
+  row.className = "header-row";
+  row.innerHTML = `<input placeholder="Header name" value="${escapeHtml(key)}"><input placeholder="Header value" value="${escapeHtml(value)}"><button type="button" data-danger="true">x</button>`;
+  row.querySelector("button").onclick = () => row.remove();
+  headersList.appendChild(row);
 }
-
-function editRule(id) {
-    const rule = rules.find(r => r.id === id);
-    if (rule) openModal(rule);
-}
-
-function addHeaderRow(key, value) {
-    const hl = document.getElementById('headersList');
-    const row = document.createElement('div');
-    row.className = 'header-row';
-    row.innerHTML = `
-        <input type="text" placeholder="Header name" value="${esc(key || '')}" />
-        <input type="text" placeholder="Header value" value="${esc(value || '')}" />
-        <button class="btn btn-sm btn-danger" type="button" onclick="this.parentElement.remove()">&#10005;</button>
-    `;
-    hl.appendChild(row);
-}
-
-/* ── File upload (read as base64, store in DB with rule) ──────────── */
-let pendingFileData = null;  // base64 string of file content
 
 function handleFileUpload(input) {
-    const file = input.files[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-        document.getElementById('fileInfo').textContent = 'File too large (max 10MB)';
-        input.value = '';
-        return;
-    }
-
-    const infoEl = document.getElementById('fileInfo');
-    infoEl.textContent = 'Reading...';
-
-    const reader = new FileReader();
-    reader.onload = function() {
-        const b64 = reader.result.split(',')[1];  // strip data:...;base64, prefix
-        pendingFileData = b64;
-        document.getElementById('fResponseFile').value = file.name;
-        infoEl.innerHTML = `<span class="file-active">${esc(file.name)}</span> (${(file.size / 1024).toFixed(1)} KB)`;
-        document.getElementById('btnClearFile').style.display = '';
-        // Auto-detect content type from extension
-        const ext = file.name.split('.').pop().toLowerCase();
-        const mimeMap = {png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', svg:'image/svg+xml', pdf:'application/pdf'};
-        if (mimeMap[ext]) {
-            document.getElementById('fContentType').value = mimeMap[ext];
-        }
-    };
-    reader.readAsDataURL(file);
-    input.value = '';
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { fileInfo.textContent = "File too large (max 10MB)"; input.value = ""; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    pendingFileData = reader.result.split(",")[1];
+    fResponseFile.value = file.name;
+    fileInfo.textContent = `file: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    clearFileBtn.hidden = false;
+    const ext = file.name.split(".").pop().toLowerCase();
+    const mime = { png:"image/png", jpg:"image/jpeg", jpeg:"image/jpeg", gif:"image/gif", svg:"image/svg+xml", pdf:"application/pdf" }[ext];
+    if (mime) fContentType.value = mime;
+  };
+  reader.readAsDataURL(file);
+  input.value = "";
 }
-
 function clearUploadedFile() {
-    pendingFileData = null;
-    document.getElementById('fResponseFile').value = '';
-    document.getElementById('fileInfo').textContent = '';
-    document.getElementById('btnClearFile').style.display = 'none';
-    document.getElementById('fileUpload').value = '';
+  pendingFileData = null;
+  fResponseFile.value = "";
+  fileInfo.textContent = "";
+  clearFileBtn.hidden = true;
 }
 
 async function saveRule() {
-    const statusEl = document.getElementById('formStatus');
-    const editId = document.getElementById('editId').value;
-    const path = document.getElementById('fPath').value.trim();
-    if (!path) {
-        statusEl.textContent = 'Path is required';
-        statusEl.className = 'status-msg error';
-        return;
-    }
+  const path = fPath.value.trim();
+  if (!path) { formStatus.textContent = "Path is required"; return; }
+  const headers = {};
+  headersList.querySelectorAll(".header-row").forEach(row => {
+    const inputs = row.querySelectorAll("input");
+    const key = inputs[0].value.trim();
+    if (key) headers[key] = inputs[1].value.trim();
+  });
+  const id = editId.value;
+  const payload = {
+    path,
+    method: fMethod.value,
+    status_code: Number(fStatus.value) || 200,
+    content_type: fContentType.value,
+    response_body: fBody.value,
+    response_file: fResponseFile.value,
+    headers,
+    priority: id ? (rules.find(r => r.id === id)?.priority || 0) : rules.length,
+  };
+  if (pendingFileData) payload.response_file_data_b64 = pendingFileData;
+  const resp = await fetch(id ? `/api/mock-rules/${encodeURIComponent(id)}` : "/api/mock-rules", {
+    method: id ? "PUT" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    formStatus.textContent = data.error || "Save failed";
+    return;
+  }
+  closeRuleModal();
+  loadRules();
+}
 
-    const headers = {};
-    document.querySelectorAll('#headersList .header-row').forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        const k = inputs[0].value.trim();
-        const v = inputs[1].value.trim();
-        if (k) headers[k] = v;
+function exportRules() {
+  const blob = new Blob([JSON.stringify({ rules }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = "pega-mock-rules.json"; a.click();
+  URL.revokeObjectURL(url);
+}
+async function importRules() {
+  const file = importFile.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const data = JSON.parse(text);
+  const incoming = Array.isArray(data) ? data : data.rules;
+  if (!Array.isArray(incoming)) { alert("Import file must contain a rules array"); return; }
+  for (const [i, rule] of incoming.entries()) {
+    await fetch("/api/mock-rules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: rule.path || "/",
+        method: (rule.method || "ANY").toUpperCase(),
+        status_code: Number(rule.status_code || rule.status || 200),
+        response_body: rule.response_body || rule.body || "",
+        content_type: rule.content_type || rule.ct || "application/json",
+        headers: rule.headers || {},
+        enabled: rule.enabled !== false,
+        priority: rules.length + i,
+      }),
     });
-
-    const payload = {
-        path,
-        method: document.getElementById('fMethod').value,
-        status_code: parseInt(document.getElementById('fStatus').value) || 200,
-        content_type: document.getElementById('fContentType').value,
-        response_body: document.getElementById('fBody').value,
-        response_file: document.getElementById('fResponseFile').value,
-        headers,
-        priority: editId ? (rules.find(r => r.id === editId)?.priority || 0) : rules.length,
-    };
-    if (pendingFileData) {
-        payload.response_file_data_b64 = pendingFileData;
-    }
-
-    const url = editId ? `/api/mock-rules/${editId}` : '/api/mock-rules';
-    const method = editId ? 'PUT' : 'POST';
-
-    try {
-        const resp = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-        if (resp.ok) {
-            pendingFileData = null;
-            closeModal();
-            loadRules();
-        } else {
-            const data = await resp.json();
-            statusEl.textContent = data.error || 'Save failed';
-            statusEl.className = 'status-msg error';
-        }
-    } catch (e) {
-        statusEl.textContent = 'Network error';
-        statusEl.className = 'status-msg error';
-    }
+  }
+  importFile.value = "";
+  loadRules();
 }
 
-/* ── Logout ──────────────────────────────────────────────────────── */
-async function doLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/login';
-}
-
-/* ── Check if password set (show logout btn) ─────────────────────── */
 async function checkAuth() {
-    try {
-        const resp = await fetch('/api/config');
-        if (resp.ok) {
-            const cfg = await resp.json();
-            if (cfg.password_set) {
-                document.getElementById('logoutBtn').style.display = '';
-            }
-        }
-    } catch {}
+  const resp = await fetch("/api/config");
+  if (resp.ok) {
+    const cfg = await resp.json();
+    logoutBtn.style.display = cfg.password_set ? "" : "none";
+  }
 }
+async function doLogout() { await fetch("/api/auth/logout", { method: "POST" }); location.href = "/login"; }
 
-/* ── Init ─────────────────────────────────────────────────────────── */
+applyTheme(localStorage.getItem("pega-theme") || "dark");
+bindEvents();
 loadRules();
 checkAuth();
 </script>

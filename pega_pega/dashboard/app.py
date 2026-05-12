@@ -88,7 +88,7 @@ def create_app(
     async def login_page(request: Request):
         if not _password_required():
             return RedirectResponse("/", status_code=302)
-        return templates.TemplateResponse("login.html", {"request": request})
+        return templates.TemplateResponse(request, "login.html")
 
     @app.post("/api/auth/login")
     async def auth_login(request: Request):
@@ -123,7 +123,7 @@ def create_app(
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
-        return templates.TemplateResponse("index.html", {"request": request})
+        return templates.TemplateResponse(request, "index.html")
 
     # ── REST API ─────────────────────────────────────────────────────
 
@@ -150,7 +150,7 @@ def create_app(
             offset=offset,
             search=search,
         )
-        total = await store.count(protocol=protocol)
+        total = await store.count(protocol=protocol, search=search)
         return {"requests": rows, "total": total}
 
     @app.get("/api/requests/{request_id}")
@@ -401,7 +401,7 @@ def create_app(
 
     @app.get("/mock", response_class=HTMLResponse)
     async def mock_page(request: Request):
-        return templates.TemplateResponse("mock.html", {"request": request})
+        return templates.TemplateResponse(request, "mock.html")
 
     @app.get("/api/mock-rules")
     async def list_mock_rules():

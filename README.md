@@ -1,6 +1,6 @@
 # pega-pega
 
-Multi-protocol request logger and catcher. Listens on **14 protocols**, logs every incoming request, and displays them in a web dashboard and terminal UI.
+Multi-protocol request logger and catcher. Listens on **14 protocols**, logs every incoming request, and displays them in a terminal-style web dashboard and terminal UI.
 
 ```
   ____  _____ ____    _        ____  _____ ____    _
@@ -121,8 +121,10 @@ All handlers return **realistic responses** to encourage clients to send full pa
 
 ## Features
 
-- **Web dashboard** — real-time updates via WebSocket, protocol filtering, search, hex viewer
-- **Request actions** — per-request menu to block IP or delete individual entries, plus bulk clear
+- **Revamped web dashboard** — terminal-style request log with one-line protocol stats, live request graphs, quick filters, saved searches, and WebSocket updates
+- **Request detail drawer** — inspect parsed fields, headers, body, raw payload, and hex without leaving the log
+- **Request actions** — block IPs, delete individual entries, export requests, copy curl commands, and bulk clear
+- **Action column** — separates request verbs/operations like GET, POST, QUERY, LOGIN, and BIND from the target summary
 - **IP blocking** — blocked IPs are filtered from all views, counts, and stats
 - **Subdomain tracking** — DNS resolves all subdomains to your IP, HTTP extracts subdomain from Host header
 - **Dashboard auth** — optional password protection
@@ -134,6 +136,8 @@ All handlers return **realistic responses** to encourage clients to send full pa
 
 Define custom HTTP responses at `/mock` on the dashboard. Requests matching a mock rule get your configured response; they're still captured in the main log.
 
+The mock-rules page includes search, drag-and-drop priority ordering, enable/disable toggles, import/export, file-backed responses, custom headers, and a drawer editor. Settings are available from the same top navigation as the dashboard.
+
 **Path patterns:**
 - Exact: `/api/users`, `/health`
 - Param wildcard: `/api/users/:id` — matches any single segment (`/api/users/123`)
@@ -141,7 +145,7 @@ Define custom HTTP responses at `/mock` on the dashboard. Requests matching a mo
 
 **Method matching:** filter by GET, POST, PUT, DELETE, PATCH — or use ANY to match all methods.
 
-**Custom responses:** set status code (200, 404, 500...), response body, Content-Type, and arbitrary headers per rule.
+**Custom responses:** set status code (200, 404, 500...), response body, Content-Type, arbitrary headers, or upload a binary/text file to serve from SQLite.
 
 **Priority:** rules are evaluated top-down — first match wins. Drag to reorder in the UI. Rules can be toggled on/off without deleting.
 

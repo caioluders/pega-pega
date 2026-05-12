@@ -181,21 +181,29 @@ class Store:
                 pass
         return d
 
-    async def count(self, protocol: str | None = None) -> int:
+    async def count(
+        self,
+        protocol: str | None = None,
+        search: str | None = None,
+    ) -> int:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(self._executor, self._count, protocol)
+        return await loop.run_in_executor(self._executor, self._count, protocol, search)
 
-    def _count(self, protocol: str | None) -> int:
-        blocked_filter = "source_ip NOT IN (SELECT ip FROM blocked_ips)"
+    def _count(self, protocol: str | None, search: str | None) -> int:
+        conditions = ["source_ip NOT IN (SELECT ip FROM blocked_ips)"]
+        params: list = []
         if protocol:
-            cursor = self._conn.execute(
-                f"SELECT COUNT(*) FROM requests WHERE {blocked_filter} AND protocol = ?",
-                (protocol.upper(),),
+            conditions.append("protocol = ?")
+            params.append(protocol.upper())
+        if search:
+            conditions.append(
+                "(summary LIKE ? OR subdomain LIKE ? OR source_ip LIKE ? OR details LIKE ?)"
             )
-        else:
-            cursor = self._conn.execute(
-                f"SELECT COUNT(*) FROM requests WHERE {blocked_filter}"
-            )
+            s = f"%{search}%"
+            params.extend([s, s, s, s])
+
+        sql = "SELECT COUNT(*) FROM requests WHERE " + " AND ".join(conditions)
+        cursor = self._conn.execute(sql, params)
         return cursor.fetchone()[0]
 
     # ── Delete requests ─────────────────────────────────────────────
