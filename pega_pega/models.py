@@ -21,6 +21,9 @@ class Protocol(str, Enum):
     RAW_TCP = "RAW_TCP"
     SNMP = "SNMP"
     SYSLOG = "SYSLOG"
+    LLMNR = "LLMNR"
+    NBTNS = "NBTNS"
+    SMB = "SMB"
 
 
 @dataclass

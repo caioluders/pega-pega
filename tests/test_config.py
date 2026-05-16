@@ -6,9 +6,9 @@ import yaml
 from pega_pega.config import Config, ProtocolConfig, LetsEncryptConfig
 
 
-def test_default_config_has_14_protocols():
+def test_default_config_has_all_protocols():
     cfg = Config()
-    assert len(cfg.protocols) == 14
+    assert len(cfg.protocols) == 17
 
 
 def test_default_ports():
@@ -52,7 +52,7 @@ def test_load_from_yaml(tmp_path):
 def test_load_nonexistent_uses_defaults():
     cfg = Config.load(Path("/nonexistent/config.yaml"))
     assert cfg.domain == "pega.local"
-    assert len(cfg.protocols) == 14
+    assert len(cfg.protocols) == 17
 
 
 def test_load_empty_yaml(tmp_path):

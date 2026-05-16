@@ -165,7 +165,7 @@
 
 <script src="/static/app.js"></script>
 <script>
-const PROTOCOLS = ["HTTP","HTTPS","DNS","FTP","SMTP","POP3","IMAP","SSH","TELNET","LDAP","MYSQL","RAW_TCP","SNMP","SYSLOG"];
+const PROTOCOLS = ["HTTP","HTTPS","DNS","FTP","SMTP","POP3","IMAP","SSH","TELNET","LDAP","MYSQL","RAW_TCP","SNMP","SYSLOG","LLMNR","NBTNS","SMB"];
 const PAGE_SIZE = 100;
 let state = { page: 0, proto: "", search: "", total: 0, rows: [], selected: null, paused: false, stream: [], recentEvents: [], statsData: null, configLoaded: false };
 let ws = null;

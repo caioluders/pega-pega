@@ -31,6 +31,9 @@
   --p-raw_tcp: #b8b3a6;
   --p-snmp:    #b9ff4a;
   --p-syslog:  #b07cff;
+  --p-llmnr:   #ff4a6b;
+  --p-nbtns:   #ff9e4a;
+  --p-smb:     #4affe0;
 
   --row-h: 26px;
   --grid: 16px;
@@ -63,6 +66,9 @@
   --p-raw_tcp: #525147;
   --p-snmp:    #4d7c0f;
   --p-syslog:  #6d28d9;
+  --p-llmnr:   #be123c;
+  --p-nbtns:   #c2410c;
+  --p-smb:     #0e7490;
 }
 
 * { box-sizing: border-box; }

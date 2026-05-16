@@ -13,6 +13,9 @@ from .mysql_handler import MysqlHandler
 from .raw_tcp_handler import RawTcpHandler
 from .snmp_handler import SnmpHandler
 from .syslog_handler import SyslogHandler
+from .llmnr_handler import LlmnrHandler
+from .nbtns_handler import NbtnsHandler
+from .smb_handler import SmbHandler
 
 HANDLER_REGISTRY: dict[str, type[BaseProtocolHandler]] = {
     "http": HttpHandler,
@@ -29,4 +32,7 @@ HANDLER_REGISTRY: dict[str, type[BaseProtocolHandler]] = {
     "raw_tcp": RawTcpHandler,
     "snmp": SnmpHandler,
     "syslog": SyslogHandler,
+    "llmnr": LlmnrHandler,
+    "nbtns": NbtnsHandler,
+    "smb": SmbHandler,
 }

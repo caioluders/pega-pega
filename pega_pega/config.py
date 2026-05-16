@@ -49,6 +49,9 @@ class Config:
         "raw_tcp": 9999,
         "snmp": 161,
         "syslog": 514,
+        "llmnr": 5355,
+        "nbtns": 137,
+        "smb": 445,
     }, repr=False)
 
     EXTRA_PORT_DEFAULTS: dict[str, list[int]] = field(default_factory=lambda: {

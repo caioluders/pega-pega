@@ -3,8 +3,8 @@ import json
 from pega_pega.models import CapturedRequest, Protocol
 
 
-def test_protocol_enum_has_14_members():
-    assert len(Protocol) == 14
+def test_protocol_enum_has_all_members():
+    assert len(Protocol) == 17
 
 
 def test_protocol_is_str_enum():
