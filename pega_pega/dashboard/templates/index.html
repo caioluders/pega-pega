@@ -549,13 +549,18 @@ function openSettings() { settingsScrim.hidden = false; settingsDrawer.hidden = 
 function closeSettings() { settingsScrim.hidden = true; settingsDrawer.hidden = true; }
 async function saveConfig() {
   saveStatus.textContent = "Saving...";
-  // Always save filters (instant, no restart)
+  // Always save filters first (instant, no restart needed)
   await saveFilters();
   // Check if server config actually changed
+  if (!_savedServerConfig) {
+    // Config hasn't loaded yet — only filters were saved, that's fine
+    saveStatus.textContent = "Saved";
+    return;
+  }
   const currentProtos = {};
   protocolToggles.querySelectorAll("input[data-proto]").forEach(cb => currentProtos[cb.dataset.proto] = cb.checked);
   const current = { domain: cfgDomain.value, response_ip: cfgResponseIp.value, bind_ip: cfgBindIp.value, dashboard_port: Number(cfgDashboardPort.value) || 8443, le_enabled: cfgLeEnabled.checked, le_email: cfgLeEmail.value, protocols: currentProtos };
-  const serverChanged = !_savedServerConfig || cfgPassword.value || JSON.stringify(current) !== JSON.stringify(_savedServerConfig);
+  const serverChanged = cfgPassword.value || JSON.stringify(current) !== JSON.stringify(_savedServerConfig);
   if (!serverChanged) {
     saveStatus.textContent = "Saved";
     return;
