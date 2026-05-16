@@ -88,6 +88,13 @@ class Store:
             self._conn.execute(
                 "ALTER TABLE mock_rules ADD COLUMN ntlm_capture INTEGER NOT NULL DEFAULT 0"
             )
+        # Migration: add basic_auth_capture column if missing
+        try:
+            self._conn.execute("SELECT basic_auth_capture FROM mock_rules LIMIT 0")
+        except Exception:
+            self._conn.execute(
+                "ALTER TABLE mock_rules ADD COLUMN basic_auth_capture INTEGER NOT NULL DEFAULT 0"
+            )
         # Settings KV store
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS settings (
@@ -320,8 +327,8 @@ class Store:
             """INSERT OR REPLACE INTO mock_rules
                (id, path, method, status_code, response_body, content_type,
                 headers, enabled, priority, response_file, response_file_data,
-                ntlm_capture, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ntlm_capture, basic_auth_capture, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 rule.id,
                 rule.path,
@@ -335,6 +342,7 @@ class Store:
                 rule.response_file,
                 rule.response_file_data,
                 1 if rule.ntlm_capture else 0,
+                1 if rule.basic_auth_capture else 0,
                 rule.created_at,
             ),
         )
@@ -354,6 +362,7 @@ class Store:
             d = dict(zip(columns, row))
             d["enabled"] = bool(d["enabled"])
             d["ntlm_capture"] = bool(d.get("ntlm_capture", 0))
+            d["basic_auth_capture"] = bool(d.get("basic_auth_capture", 0))
             if d.get("headers"):
                 try:
                     d["headers"] = json.loads(d["headers"])
@@ -377,6 +386,7 @@ class Store:
         d = dict(zip(columns, row))
         d["enabled"] = bool(d["enabled"])
         d["ntlm_capture"] = bool(d.get("ntlm_capture", 0))
+        d["basic_auth_capture"] = bool(d.get("basic_auth_capture", 0))
         if d.get("headers"):
             try:
                 d["headers"] = json.loads(d["headers"])
@@ -391,6 +401,100 @@ class Store:
     def _delete_mock_rule(self, rule_id: str):
         self._conn.execute("DELETE FROM mock_rules WHERE id = ?", (rule_id,))
         self._conn.commit()
+
+    # ── Credentials query ──────────────────────────────────────────────
+
+    async def list_credentials(self, limit: int = 500) -> list[dict]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self._list_credentials, limit)
+
+    def _list_credentials(self, limit: int) -> list[dict]:
+        """Extract credentials from captured requests across all protocols."""
+        # Search for requests containing credential-related keywords
+        cursor = self._conn.execute(
+            """SELECT id, timestamp, protocol, source_ip, source_port, details
+               FROM requests
+               WHERE source_ip NOT IN (SELECT ip FROM blocked_ips)
+               AND (details LIKE '%password%' OR details LIKE '%credential_%'
+                    OR details LIKE '%ntlm_hash%' OR details LIKE '%auth_user%'
+                    OR details LIKE '%auth_response_hex%' OR details LIKE '%community%')
+               ORDER BY timestamp DESC LIMIT ?""",
+            (limit,),
+        )
+        results = []
+        for row in cursor.fetchall():
+            req_id, timestamp, protocol, source_ip, source_port, details_raw = row
+            try:
+                details = json.loads(details_raw) if details_raw else {}
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+            cred = self._extract_credential(details, protocol)
+            if cred:
+                cred["id"] = req_id
+                cred["timestamp"] = timestamp
+                cred["protocol"] = protocol
+                cred["source_ip"] = source_ip
+                cred["source_port"] = source_port
+                results.append(cred)
+        return results
+
+    @staticmethod
+    def _extract_credential(details: dict, protocol: str) -> dict | None:
+        """Normalize credential fields from various protocols."""
+        # NTLM hash
+        if details.get("ntlm_hash"):
+            return {
+                "type": "ntlm_v2",
+                "user": details.get("ntlm_user", ""),
+                "secret": details["ntlm_hash"],
+                "domain": details.get("ntlm_domain", ""),
+                "hashcat_mode": "5600",
+            }
+        # Basic auth
+        if details.get("credential_type") == "basic":
+            return {
+                "type": "basic",
+                "user": details.get("credential_user", ""),
+                "secret": details.get("credential_secret", ""),
+            }
+        # SMTP
+        if details.get("auth_user"):
+            return {
+                "type": "plaintext",
+                "user": details["auth_user"],
+                "secret": details.get("auth_pass", ""),
+            }
+        # FTP, POP3, IMAP, Telnet, SSH (password)
+        if details.get("username") and details.get("password"):
+            return {
+                "type": "plaintext",
+                "user": details["username"],
+                "secret": details["password"],
+            }
+        # LDAP simple bind
+        if details.get("dn") and details.get("password"):
+            return {
+                "type": "plaintext",
+                "user": details["dn"],
+                "secret": details["password"],
+            }
+        # MySQL
+        if details.get("username") and details.get("auth_response_hex"):
+            return {
+                "type": "mysql_hash",
+                "user": details["username"],
+                "secret": details["auth_response_hex"],
+                "database": details.get("database", ""),
+            }
+        # SNMP community
+        if details.get("community"):
+            return {
+                "type": "community_string",
+                "user": "",
+                "secret": details["community"],
+            }
+        return None
 
     # ── Settings KV store ──────────────────────────────────────────────
 

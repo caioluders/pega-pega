@@ -165,6 +165,30 @@ class HttpHandler(BaseProtocolHandler):
                     else:
                         # No auth header — send initial 401
                         response_bytes = self._build_ntlm_initial_response(version)
+                elif mock_rule and mock_rule.get("basic_auth_capture"):
+                    # Basic auth capture — single round-trip
+                    auth_header = headers.get("authorization", "")
+                    if auth_header.lower().startswith("basic "):
+                        import base64 as b64mod
+                        try:
+                            decoded = b64mod.b64decode(auth_header[6:]).decode("utf-8", errors="replace")
+                            user, _, password = decoded.partition(":")
+                            details["credential_type"] = "basic"
+                            details["credential_user"] = user
+                            details["credential_secret"] = password
+                            captured.details = details
+                            captured.summary = f"{method} {path} [Basic: {user}]"
+                            logger.info(
+                                "Basic auth captured: %s:%s from %s:%d",
+                                user, password, source_ip, source_port,
+                            )
+                            await self.emit(captured)
+                        except Exception:
+                            pass
+                        response_bytes = self._build_mock_response(mock_rule, version)
+                    else:
+                        # No auth — send 401
+                        response_bytes = self._build_basic_auth_response(version)
                 elif mock_rule:
                     logger.info("Mock rule matched: %s %s → rule %s", method, parsed.path, mock_rule.get("id", "?"))
                     response_bytes = self._build_mock_response(mock_rule, version)
@@ -406,6 +430,20 @@ class HttpHandler(BaseProtocolHandler):
             "\r\n"
         )
         return (status_line + headers).encode() + body
+
+    @staticmethod
+    def _build_basic_auth_response(version: str) -> bytes:
+        """401 response requesting Basic auth."""
+        body = b"<html><body><h1>401 Unauthorized</h1></body></html>"
+        return (
+            f"{version} 401 Unauthorized\r\n"
+            'WWW-Authenticate: Basic realm="Restricted"\r\n'
+            "Content-Type: text/html\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: keep-alive\r\n"
+            "Server: pega-pega\r\n"
+            "\r\n"
+        ).encode() + body
 
     @staticmethod
     def _build_ntlm_initial_response(version: str) -> bytes:

@@ -697,6 +697,38 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .code-block .str { color: var(--p-https); }
 .code-block .num { color: var(--p-ftp); }
 
+.cred-type {
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid var(--rule-strong);
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.cred-type-warn { color: var(--warn); border-color: var(--warn); }
+.cred-type-accent { color: var(--accent); border-color: var(--accent); }
+.cred-type-ok { color: var(--ok); border-color: var(--ok); }
+.cred-type-p-mysql { color: var(--p-mysql); border-color: var(--p-mysql); }
+.cred-type-p-snmp { color: var(--p-snmp); border-color: var(--p-snmp); }
+.cred-secret {
+  font-family: inherit;
+  word-break: break-all;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cred-user { font-weight: 600; }
+.cred-stats {
+  display: flex;
+  gap: 12px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+.copy-btn {
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid var(--rule-strong);
+}
+
 .ntlm-hash-box {
   border: 1px solid var(--warn);
   padding: 12px;

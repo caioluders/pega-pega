@@ -60,6 +60,7 @@ class MockRule:
     response_file: str = ""
     response_file_data: bytes | None = None
     ntlm_capture: bool = False
+    basic_auth_capture: bool = False
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict:
@@ -75,5 +76,6 @@ class MockRule:
             "priority": self.priority,
             "response_file": self.response_file,
             "ntlm_capture": self.ntlm_capture,
+            "basic_auth_capture": self.basic_auth_capture,
             "created_at": self.created_at,
         }

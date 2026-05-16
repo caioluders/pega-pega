@@ -16,6 +16,7 @@
     <nav class="nav">
       <a href="/">Dashboard</a>
       <a href="/mock" aria-current="page">Mock Rules</a>
+      <a href="/credentials">Credentials</a>
       <a href="/?settings=1">Settings</a>
     </nav>
     <div class="top-right">
@@ -73,7 +74,8 @@
             <option value="application/octet-stream">application/octet-stream</option>
           </select></label>
         </div>
-        <label class="settings-check"><input type="checkbox" id="fNtlmCapture"> Capture NTLM hash <span class="dim">(responds 401 + WWW-Authenticate: NTLM to force auth)</span></label>
+        <label class="settings-check"><input type="checkbox" id="fNtlmCapture"> Capture NTLM hash <span class="dim">(responds 401 + WWW-Authenticate: NTLM)</span></label>
+        <label class="settings-check"><input type="checkbox" id="fBasicAuthCapture"> Capture Basic auth <span class="dim">(responds 401 + WWW-Authenticate: Basic)</span></label>
       </div>
     </section>
     <section class="d-section">
@@ -264,6 +266,7 @@ function openModal(rule) {
   fContentType.value = rule ? rule.content_type : "application/json";
   fBody.value = rule ? rule.response_body : "";
   fNtlmCapture.checked = rule ? !!rule.ntlm_capture : false;
+  fBasicAuthCapture.checked = rule ? !!rule.basic_auth_capture : false;
   fResponseFile.value = rule ? (rule.response_file || "") : "";
   fileInfo.textContent = fResponseFile.value ? `file: ${fResponseFile.value}` : "";
   clearFileBtn.hidden = !fResponseFile.value;
@@ -325,6 +328,7 @@ async function saveRule() {
     response_body: fBody.value,
     response_file: fResponseFile.value,
     ntlm_capture: fNtlmCapture.checked,
+    basic_auth_capture: fBasicAuthCapture.checked,
     headers,
     priority: id ? (rules.find(r => r.id === id)?.priority || 0) : rules.length,
   };

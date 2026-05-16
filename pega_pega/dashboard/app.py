@@ -215,6 +215,17 @@ def create_app(
         rows = await store.recent_activity(minutes=minutes, limit=limit)
         return {"events": rows}
 
+    # ── Credentials API ────────────────────────────────────────────────
+
+    @app.get("/api/credentials")
+    async def list_credentials(limit: int = Query(500, ge=1, le=5000)):
+        creds = await store.list_credentials(limit=limit)
+        return {"credentials": creds, "total": len(creds)}
+
+    @app.get("/credentials", response_class=HTMLResponse)
+    async def credentials_page(request: Request):
+        return templates.TemplateResponse(request, "credentials.html")
+
     # ── Filters API ──────────────────────────────────────────────────
 
     @app.get("/api/filters")
@@ -477,6 +488,7 @@ def create_app(
             response_file=body.get("response_file", ""),
             response_file_data=file_data,
             ntlm_capture=bool(body.get("ntlm_capture", False)),
+            basic_auth_capture=bool(body.get("basic_auth_capture", False)),
         )
         await store.save_mock_rule(rule)
         await _reload_matcher()
@@ -514,6 +526,7 @@ def create_app(
             response_file=body.get("response_file", existing.get("response_file", "")),
             response_file_data=file_data,
             ntlm_capture=bool(body.get("ntlm_capture", existing.get("ntlm_capture", False))),
+            basic_auth_capture=bool(body.get("basic_auth_capture", existing.get("basic_auth_capture", False))),
             created_at=existing["created_at"],
         )
         await store.save_mock_rule(rule)
@@ -556,6 +569,7 @@ def create_app(
                     response_file=existing.get("response_file", ""),
                     response_file_data=existing.get("response_file_data"),
                     ntlm_capture=bool(existing.get("ntlm_capture", False)),
+                    basic_auth_capture=bool(existing.get("basic_auth_capture", False)),
                     created_at=existing["created_at"],
                 )
                 await store.save_mock_rule(rule)
