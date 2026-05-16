@@ -1,0 +1,23 @@
+services:
+  pega-pega:
+    build: .
+    image: pega-pega
+    container_name: pega-pega
+    network_mode: host
+    volumes:
+      - pega-data:/data
+      - pega-certs:/app/.certs
+    command:
+      - "--db"
+      - "/data/pega_pega.db"
+      # - "-d"
+      # - "yourdomain.com"
+      # - "-r"
+      # - "1.2.3.4"
+      # - "--dashboard-password"
+      # - "s3cret"
+    restart: unless-stopped
+
+volumes:
+  pega-data:
+  pega-certs:

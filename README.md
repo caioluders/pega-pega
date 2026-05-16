@@ -31,6 +31,26 @@ curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh
 
 Point a wildcard DNS record (`*.yourdomain.com`) to your server.
 
+### Docker
+
+```bash
+docker run -d --network host --name pega-pega \
+  -v pega-data:/data \
+  ghcr.io/caioluders/pega-pega \
+  -d yourdomain.com -r 1.2.3.4 --db /data/pega_pega.db
+```
+
+Or with docker compose:
+
+```bash
+git clone https://github.com/caioluders/pega-pega.git
+cd pega-pega
+# edit docker-compose.yml to set domain/ip/password
+docker compose up -d
+```
+
+`--network host` is required so all 14 protocol ports bind directly.
+
 <details>
 <summary>Options & service management</summary>
 
