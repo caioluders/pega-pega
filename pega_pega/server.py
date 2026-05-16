@@ -8,6 +8,7 @@ import uvicorn
 from .bus import EventBus
 from .certs import generate_self_signed_cert
 from .config import Config, ProtocolConfig
+from .filters import RequestFilter
 from .mock import MockMatcher
 from .dashboard.app import create_app
 from .display import TerminalDisplay
@@ -32,11 +33,16 @@ class PegaPegaServer:
         self.display = TerminalDisplay(self.bus)
         self.handlers = []
         self.mock_matcher = MockMatcher()
+        self.request_filter = RequestFilter()
         self._cert_path: Path | None = None
         self._key_path: Path | None = None
 
     async def start(self):
         await self.store.initialize()
+
+        # Load filter config from DB
+        filter_config = await self.store.get_filter_config()
+        self.request_filter.update_config(filter_config)
 
         # Load mock rules into matcher
         rules = await self.store.list_mock_rules()
@@ -88,7 +94,7 @@ class PegaPegaServer:
         await self._start_protocol_handlers()
 
         # Start background store consumer
-        asyncio.create_task(store_consumer(self.bus, self.store))
+        asyncio.create_task(store_consumer(self.bus, self.store, self.request_filter))
 
         # ── Start certificate renewal loop ────────────────────────────
         if use_le_certs:
@@ -102,7 +108,7 @@ class PegaPegaServer:
 
         # ── Start web dashboard ───────────────────────────────────────
         if not self.config.no_dashboard:
-            app = create_app(self.store, self.bus, self.config, self.mock_matcher)
+            app = create_app(self.store, self.bus, self.config, self.mock_matcher, self.request_filter)
             dashboard_kwargs = {
                 "host": self.config.dashboard_host,
                 "port": self.config.dashboard_port,

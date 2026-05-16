@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .bus import EventBus
+from .filters import FilterConfig
 from .models import CapturedRequest, MockRule
 
 
@@ -87,6 +88,13 @@ class Store:
             self._conn.execute(
                 "ALTER TABLE mock_rules ADD COLUMN ntlm_capture INTEGER NOT NULL DEFAULT 0"
             )
+        # Settings KV store
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
         self._conn.commit()
 
     async def save(self, req: CapturedRequest):
@@ -384,6 +392,42 @@ class Store:
         self._conn.execute("DELETE FROM mock_rules WHERE id = ?", (rule_id,))
         self._conn.commit()
 
+    # ── Settings KV store ──────────────────────────────────────────────
+
+    async def get_setting(self, key: str) -> str | None:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self._get_setting, key)
+
+    def _get_setting(self, key: str) -> str | None:
+        cursor = self._conn.execute("SELECT value FROM settings WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+    async def set_setting(self, key: str, value: str):
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(self._executor, self._set_setting, key, value)
+
+    def _set_setting(self, key: str, value: str):
+        self._conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+            (key, value),
+        )
+        self._conn.commit()
+
+    async def get_filter_config(self) -> FilterConfig:
+        raw = await self.get_setting("filter_config")
+        if raw:
+            try:
+                return FilterConfig.from_dict(json.loads(raw))
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return FilterConfig()
+
+    async def save_filter_config(self, config: FilterConfig):
+        await self.set_setting("filter_config", json.dumps(config.to_dict()))
+
+    # ── Close ────────────────────────────────────────────────────────
+
     async def close(self):
         if self._conn:
             loop = asyncio.get_running_loop()
@@ -395,8 +439,20 @@ class Store:
             self._conn = None
 
 
-async def store_consumer(bus: EventBus, store: Store):
+async def store_consumer(bus: EventBus, store: Store, request_filter=None):
     queue = bus.subscribe()
     while True:
         event = await queue.get()
+        if request_filter:
+            from .filters import FilterResult
+            result = request_filter.check(event.source_ip, event.details)
+            if result.action == "drop":
+                continue
+            if result.action == "block":
+                await store.add_blocked_ip(event.source_ip)
+                continue
+            if result.action == "tag" and result.tag:
+                event.details = dict(event.details) if event.details else {}
+                event.details["_filter_tag"] = result.tag
+                event.details["_filter_reason"] = result.reason
         await store.save(event)

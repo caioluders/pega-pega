@@ -126,6 +126,27 @@
       <div id="leCertInfo" class="dim"></div>
     </section>
     <section class="d-section">
+      <h5>Request filtering</h5>
+      <p class="dim" style="margin:0 0 8px">All filters are disabled by default.</p>
+      <div class="settings-form">
+        <label class="settings-check"><input id="cfgRateLimit" type="checkbox"> Rate-limit auto-block</label>
+        <div class="form-grid" id="rateLimitOpts" style="display:none">
+          <label>Max requests<input id="cfgRateMax" type="number" min="1" value="50"></label>
+          <label>Window (seconds)<input id="cfgRateWindow" type="number" min="5" value="60"></label>
+        </div>
+        <label class="settings-check"><input id="cfgBotFilter" type="checkbox"> Hide known bots/scanners</label>
+        <label class="settings-check"><input id="cfgAllowlist" type="checkbox"> IP allowlist (drop all others)</label>
+        <div id="allowlistOpts" style="display:none">
+          <label>Allowed IPs/CIDRs <span class="dim">(one per line)</span><textarea id="cfgAllowlistIps" style="min-height:60px;width:100%;resize:vertical" placeholder="192.168.1.0/24&#10;10.0.0.5"></textarea></label>
+        </div>
+      </div>
+      <div id="autoBlockedInfo" class="dim" style="margin-top:8px"></div>
+      <div class="drawer-actions inline-actions">
+        <button type="button" id="btnClearRateBlocks">Clear rate-limit blocks</button>
+        <span id="filterStatus" class="dim"></span>
+      </div>
+    </section>
+    <section class="d-section">
       <h5>Software update</h5>
       <div class="kv"><div class="k">current version</div><div class="v" id="currentVersion">loading...</div></div>
       <div class="drawer-actions inline-actions"><button type="button" id="btnUpdate">Check for updates</button><span id="updateStatus" class="dim"></span></div>
@@ -204,6 +225,9 @@ function bindEvents() {
   document.getElementById("saveConfigBtn").onclick = saveConfig;
   document.getElementById("btnLeCert").onclick = requestLeCert;
   document.getElementById("btnUpdate").onclick = triggerUpdate;
+  document.getElementById("cfgRateLimit").onchange = () => { rateLimitOpts.style.display = cfgRateLimit.checked ? "" : "none"; };
+  document.getElementById("cfgAllowlist").onchange = () => { allowlistOpts.style.display = cfgAllowlist.checked ? "" : "none"; };
+  document.getElementById("btnClearRateBlocks").onclick = async () => { await fetch("/api/filters/clear-rate-blocks", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); filterStatus.textContent = "Cleared"; loadFilters(); };
   document.getElementById("logoutBtn").onclick = doLogout;
   document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); closeSettings(); } });
 }
@@ -512,6 +536,7 @@ async function loadConfig(silent) {
   logoutBtn.style.display = cfg.password_set ? "" : "none";
   protocolToggles.innerHTML = Object.entries(cfg.protocols || {}).map(([name, proto]) => `<label class="settings-row"><span><span class="p-tag" style="--p-c:${protoVar(name.toUpperCase())}">${escapeHtml(name.toUpperCase())}</span><span class="dim"> :${escapeHtml(proto.port || "")}</span></span><input type="checkbox" data-proto="${escapeHtml(name)}" ${proto.enabled ? "checked" : ""}></label>`).join("");
   loadLeStatus();
+  loadFilters();
 }
 function openSettings() { settingsScrim.hidden = false; settingsDrawer.hidden = false; loadConfig(true); }
 function closeSettings() { settingsScrim.hidden = true; settingsDrawer.hidden = true; }
@@ -521,7 +546,34 @@ async function saveConfig() {
   if (cfgPassword.value) body.dashboard_password = cfgPassword.value;
   protocolToggles.querySelectorAll("input[data-proto]").forEach(cb => body.protocols[cb.dataset.proto] = { enabled: cb.checked });
   const resp = await fetch("/api/config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  // Save filter config
+  await saveFilters();
   saveStatus.textContent = resp.ok ? "Saved" : "Save failed";
+}
+async function loadFilters() {
+  const f = await fetchJson("/api/filters", true);
+  if (!f) return;
+  cfgRateLimit.checked = f.rate_limit_enabled;
+  cfgRateMax.value = f.rate_limit_max_requests || 50;
+  cfgRateWindow.value = f.rate_limit_window || 60;
+  cfgBotFilter.checked = f.bot_filter_enabled;
+  cfgAllowlist.checked = f.allowlist_enabled;
+  cfgAllowlistIps.value = (f.allowlist_ips || []).join("\n");
+  rateLimitOpts.style.display = f.rate_limit_enabled ? "" : "none";
+  allowlistOpts.style.display = f.allowlist_enabled ? "" : "none";
+  const blocked = f.auto_blocked_ips || [];
+  autoBlockedInfo.textContent = blocked.length ? `${blocked.length} IPs auto-blocked by rate limit` : "";
+}
+async function saveFilters() {
+  const body = {
+    rate_limit_enabled: cfgRateLimit.checked,
+    rate_limit_window: Number(cfgRateWindow.value) || 60,
+    rate_limit_max_requests: Number(cfgRateMax.value) || 50,
+    bot_filter_enabled: cfgBotFilter.checked,
+    allowlist_enabled: cfgAllowlist.checked,
+    allowlist_ips: cfgAllowlistIps.value.split("\n").map(s => s.trim()).filter(Boolean),
+  };
+  await fetch("/api/filters", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 }
 async function loadLeStatus() {
   const st = await fetchJson("/api/letsencrypt/status", true);

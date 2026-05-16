@@ -19,6 +19,7 @@ from starlette.requests import Request
 from .. import __version__
 from ..bus import EventBus
 from ..config import Config
+from ..filters import FilterConfig, RequestFilter
 from ..mock import MockMatcher
 from ..models import MockRule, Protocol
 from ..store import Store
@@ -34,6 +35,7 @@ def create_app(
     bus: EventBus,
     config: Config | None = None,
     mock_matcher: MockMatcher | None = None,
+    request_filter: RequestFilter | None = None,
 ) -> FastAPI:
     """Factory that wires the dashboard to a shared Store and EventBus."""
 
@@ -212,6 +214,41 @@ def create_app(
         """Lightweight endpoint for sparkline data — only timestamps and protocols."""
         rows = await store.recent_activity(minutes=minutes, limit=limit)
         return {"events": rows}
+
+    # ── Filters API ──────────────────────────────────────────────────
+
+    @app.get("/api/filters")
+    async def get_filters():
+        cfg = await store.get_filter_config()
+        data = cfg.to_dict()
+        if request_filter:
+            data["auto_blocked_ips"] = request_filter.get_auto_blocked_ips()
+        return data
+
+    @app.put("/api/filters")
+    async def update_filters(request: Request):
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+        cfg = FilterConfig.from_dict(body)
+        await store.save_filter_config(cfg)
+        if request_filter:
+            request_filter.update_config(cfg)
+        return cfg.to_dict()
+
+    @app.post("/api/filters/clear-rate-blocks")
+    async def clear_rate_blocks(request: Request):
+        """Clear all or a specific IP from rate-limit auto-blocks."""
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        ip = body.get("ip")
+        if request_filter:
+            request_filter.clear_auto_blocked(ip)
+        return {"status": "cleared"}
 
     # ── Config / Settings API ────────────────────────────────────────
 
