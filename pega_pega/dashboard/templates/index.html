@@ -146,6 +146,7 @@
       </div>
       <div id="autoBlockedInfo" class="dim" style="margin-top:8px"></div>
       <div class="drawer-actions inline-actions">
+        <button type="button" data-variant="primary" id="btnApplyFilters">Apply filters</button>
         <button type="button" id="btnClearRateBlocks">Clear rate-limit blocks</button>
         <span id="filterStatus" class="dim"></span>
       </div>
@@ -232,6 +233,7 @@ function bindEvents() {
   document.getElementById("cfgRateLimit").onchange = () => { rateLimitOpts.style.display = cfgRateLimit.checked ? "" : "none"; };
   document.getElementById("cfgBotFilter").onchange = () => { botFilterOpts.style.display = cfgBotFilter.checked ? "" : "none"; };
   document.getElementById("cfgAllowlist").onchange = () => { allowlistOpts.style.display = cfgAllowlist.checked ? "" : "none"; };
+  document.getElementById("btnApplyFilters").onclick = async () => { await saveFilters(); filterStatus.textContent = "Applied"; setTimeout(() => filterStatus.textContent = "", 2000); };
   document.getElementById("btnClearRateBlocks").onclick = async () => { await fetch("/api/filters/clear-rate-blocks", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); filterStatus.textContent = "Cleared"; loadFilters(); };
   document.getElementById("logoutBtn").onclick = doLogout;
   document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); closeSettings(); } });
@@ -547,13 +549,25 @@ function openSettings() { settingsScrim.hidden = false; settingsDrawer.hidden = 
 function closeSettings() { settingsScrim.hidden = true; settingsDrawer.hidden = true; }
 async function saveConfig() {
   saveStatus.textContent = "Saving...";
+  // Save filters first (applies immediately, no restart)
+  await saveFilters();
+  // Then save server config (may trigger restart)
   const body = { domain: cfgDomain.value, response_ip: cfgResponseIp.value, bind_ip: cfgBindIp.value, dashboard_port: Number(cfgDashboardPort.value) || 8443, letsencrypt: { enabled: cfgLeEnabled.checked, email: cfgLeEmail.value, agree_tos: cfgLeEnabled.checked }, protocols: {} };
   if (cfgPassword.value) body.dashboard_password = cfgPassword.value;
   protocolToggles.querySelectorAll("input[data-proto]").forEach(cb => body.protocols[cb.dataset.proto] = { enabled: cb.checked });
-  const resp = await fetch("/api/config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  // Save filter config
-  await saveFilters();
-  saveStatus.textContent = resp.ok ? "Saved" : "Save failed";
+  try {
+    const resp = await fetch("/api/config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await resp.json().catch(() => ({}));
+    if (data.restarting) {
+      saveStatus.innerHTML = '<span class="spinner"></span> Saved. Service restarting...';
+      setTimeout(() => location.reload(), 4000);
+    } else {
+      saveStatus.textContent = resp.ok ? "Saved" : "Save failed";
+    }
+  } catch {
+    saveStatus.innerHTML = '<span class="spinner"></span> Saved. Reconnecting...';
+    setTimeout(() => location.reload(), 4000);
+  }
 }
 async function loadFilters() {
   const f = await fetchJson("/api/filters", true);
