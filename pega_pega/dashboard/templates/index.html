@@ -597,10 +597,24 @@ async function requestLeCert() {
   loadLeStatus();
 }
 async function triggerUpdate() {
-  updateStatus.textContent = "Checking...";
-  const resp = await fetch("/api/update", { method: "POST" });
-  const data = await resp.json().catch(() => ({}));
-  updateStatus.textContent = data.message || data.error || (resp.ok ? "Done" : "Failed");
+  btnUpdate.disabled = true;
+  btnUpdate.textContent = "Updating...";
+  updateStatus.innerHTML = '<span class="spinner"></span> Checking for updates...';
+  try {
+    const resp = await fetch("/api/update", { method: "POST" });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok && !data.error) {
+      updateStatus.textContent = data.message || "Updated! Reloading...";
+      setTimeout(() => location.reload(), 3000);
+    } else {
+      updateStatus.textContent = data.error || data.message || "Failed";
+      btnUpdate.disabled = false;
+      btnUpdate.textContent = "Check for updates";
+    }
+  } catch {
+    updateStatus.textContent = "Connection lost — server may be restarting...";
+    setTimeout(() => location.reload(), 5000);
+  }
 }
 async function doLogout() { await fetch("/api/auth/logout", { method: "POST" }); location.href = "/login"; }
 async function fetchJson(url, silent) {
