@@ -200,12 +200,18 @@ def create_app(
 
     @app.get("/api/stats")
     async def stats():
-        counts: dict[str, int] = {}
-        for proto in Protocol:
-            c = await store.count(protocol=proto.value)
-            counts[proto.value] = c
-        total = await store.count()
+        counts = await store.count_by_protocol()
+        total = sum(counts.values())
         return {"protocols": counts, "total": total}
+
+    @app.get("/api/recent-activity")
+    async def recent_activity(
+        minutes: int = Query(10, ge=1, le=60),
+        limit: int = Query(1000, ge=1, le=5000),
+    ):
+        """Lightweight endpoint for sparkline data — only timestamps and protocols."""
+        rows = await store.recent_activity(minutes=minutes, limit=limit)
+        return {"events": rows}
 
     # ── Config / Settings API ────────────────────────────────────────
 
@@ -433,6 +439,7 @@ def create_app(
             priority=int(body.get("priority", 0)),
             response_file=body.get("response_file", ""),
             response_file_data=file_data,
+            ntlm_capture=bool(body.get("ntlm_capture", False)),
         )
         await store.save_mock_rule(rule)
         await _reload_matcher()
@@ -469,6 +476,7 @@ def create_app(
             priority=int(body.get("priority", existing["priority"])),
             response_file=body.get("response_file", existing.get("response_file", "")),
             response_file_data=file_data,
+            ntlm_capture=bool(body.get("ntlm_capture", existing.get("ntlm_capture", False))),
             created_at=existing["created_at"],
         )
         await store.save_mock_rule(rule)
@@ -510,6 +518,7 @@ def create_app(
                     priority=i,
                     response_file=existing.get("response_file", ""),
                     response_file_data=existing.get("response_file_data"),
+                    ntlm_capture=bool(existing.get("ntlm_capture", False)),
                     created_at=existing["created_at"],
                 )
                 await store.save_mock_rule(rule)

@@ -143,6 +143,11 @@ const PROTOCOLS = ["HTTP","HTTPS","DNS","FTP","SMTP","POP3","IMAP","SSH","TELNET
 const PAGE_SIZE = 100;
 let state = { page: 0, proto: "", search: "", total: 0, rows: [], selected: null, paused: false, stream: [], recentEvents: [], statsData: null, configLoaded: false };
 let ws = null;
+let _statsTimer = null;
+function scheduleStatsRefresh() {
+  if (_statsTimer) return;
+  _statsTimer = setTimeout(() => { _statsTimer = null; loadStats(); loadRecentEvents(); }, 2000);
+}
 
 function protoVar(proto) { return `var(--p-${String(proto || "raw_tcp").toLowerCase()})`; }
 function shortProto(proto) { return proto === "RAW_TCP" ? "TCP" : proto; }
@@ -210,9 +215,9 @@ async function loadStats() {
 }
 
 async function loadRecentEvents() {
-  const data = await fetchJson("/api/requests?limit=1000");
+  const data = await fetchJson("/api/recent-activity?minutes=10&limit=1000", true);
   if (!data) return;
-  state.recentEvents = data.requests || [];
+  state.recentEvents = data.events || [];
   renderStats();
 }
 
@@ -286,7 +291,7 @@ function renderRows(newIds = new Set()) {
   state.rows.forEach((r, i) => {
     const action = requestAction(r);
     const summary = summaryWithoutAction(r.summary || "", action);
-    grid.insertAdjacentHTML("beforeend", `<button class="log-row" type="button" data-id="${escapeHtml(r.id)}" data-selected="${state.selected && state.selected.id === r.id}" data-new="${newIds.has(r.id)}">
+    grid.insertAdjacentHTML("beforeend", `<div class="log-row" data-id="${escapeHtml(r.id)}" data-selected="${state.selected && state.selected.id === r.id}" data-new="${newIds.has(r.id)}">
       <div class="col-num">${String(state.page * PAGE_SIZE + i + 1).padStart(3, "0")}</div>
       <div class="col-time">${escapeHtml(formatTime(r.timestamp))}</div>
       <div class="col-protocol"><span class="p-tag" style="--p-c:${protoVar(r.protocol)}">${escapeHtml(shortProto(r.protocol))}</span></div>
@@ -296,9 +301,12 @@ function renderRows(newIds = new Set()) {
       <div class="col-summary">${summaryHtml(summary)}</div>
       <div class="col-size">${rawSize(r)}B</div>
       <div class="col-status">›</div>
-    </button>`);
+    </div>`);
   });
-  document.querySelectorAll(".log-row").forEach(row => row.onclick = () => openDrawer(row.dataset.id));
+  document.querySelectorAll(".log-row").forEach(row => row.onclick = (e) => {
+    if (window.getSelection().toString()) return;
+    openDrawer(row.dataset.id);
+  });
   document.getElementById("visibleCount").textContent = state.total;
   document.getElementById("matchHint").textContent = `${state.rows.length}/${state.total}`;
   document.getElementById("pageLabel").textContent = String(state.page + 1);
@@ -368,6 +376,7 @@ async function openDrawer(id) {
         <button type="button" data-danger="true" onclick="deleteSelected()">Delete</button>
       </div>
       <div class="drawer-body">
+        ${details.ntlm_hash ? section("NTLM Hash Captured", `<div class="ntlm-hash-box"><div class="kv"><div class="k">user</div><div class="v">${escapeHtml(details.ntlm_user || "")}</div><div class="k">domain</div><div class="v">${escapeHtml(details.ntlm_domain || "")}</div><div class="k">format</div><div class="v">NetNTLMv2 (Hashcat 5600 / John netntlmv2)</div></div><pre class="code-block ntlm-hash">${escapeHtml(details.ntlm_hash)}</pre><button type="button" onclick="navigator.clipboard.writeText('${escapeJs(details.ntlm_hash)}')">Copy hash</button></div>`) : ""}
         ${section("Parsed fields", kvTable(details))}
         ${headers ? section("Headers", headersTable(headers)) : ""}
         ${details.body ? section("Body", `<pre class="code-block">${escapeHtml(details.body)}</pre>`) : ""}
@@ -431,10 +440,27 @@ async function deleteSelected() { if (!state.selected || !confirm("Delete this r
 function exportSelected() { if (state.selected) downloadJson(`pega-request-${state.selected.id}.json`, state.selected); }
 async function copyCurl() {
   if (!state.selected) return;
-  const d = state.selected.details || {};
-  const host = d.host || state.selected.subdomain || location.host;
+  const r = state.selected;
+  const d = r.details || {};
+  const method = (d.method || "GET").toUpperCase();
+  const host = d.headers?.host || r.subdomain || "localhost";
   const path = d.path || "/";
-  await navigator.clipboard.writeText(`curl -i '${location.protocol}//${host}${path}'`);
+  const scheme = r.protocol === "HTTPS" ? "https" : "http";
+  const port = r.dest_port || (scheme === "https" ? 443 : 80);
+  const defaultPort = (scheme === "http" && port === 80) || (scheme === "https" && port === 443);
+  const url = `${scheme}://${host}${defaultPort ? "" : ":" + port}${path}`;
+  const sq = s => "'" + String(s).replace(/'/g, "'\\''") + "'";
+  let parts = ["curl"];
+  if (method !== "GET") parts.push("-X " + sq(method));
+  parts.push("--url " + sq(url));
+  if (d.headers) {
+    for (const [k, v] of Object.entries(d.headers)) {
+      if (k.toLowerCase() === "host") continue;
+      parts.push("-H " + sq(k + ": " + v));
+    }
+  }
+  if (d.body) parts.push("-d " + sq(d.body));
+  await navigator.clipboard.writeText(parts.join(" \\\n  "));
 }
 async function clearLog() { if (!confirm("Delete all captured requests?")) return; await fetch("/api/requests", { method: "DELETE" }); closeDrawer(); loadRequests(); loadStats(); }
 
@@ -455,7 +481,7 @@ function connectWS() {
       } else {
         loadRequests();
       }
-      loadStats();
+      scheduleStatsRefresh();
     } catch (e) { console.error(e); }
   };
 }

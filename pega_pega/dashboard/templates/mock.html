@@ -73,11 +73,21 @@
             <option value="application/octet-stream">application/octet-stream</option>
           </select></label>
         </div>
+        <label class="settings-check"><input type="checkbox" id="fNtlmCapture"> Capture NTLM hash <span class="dim">(responds 401 + WWW-Authenticate: NTLM to force auth)</span></label>
       </div>
     </section>
     <section class="d-section">
       <h5>Response body</h5>
-      <textarea id="fBody" class="response-editor" placeholder='{"message": "Hello from mock!"}'></textarea>
+      <div class="editor-wrap">
+        <div class="editor-toolbar">
+          <span class="editor-status" id="editorStatus"></span>
+          <button type="button" class="editor-action" id="formatBtn">Format</button>
+        </div>
+        <div class="editor-container">
+          <div class="editor-lines" id="editorLines"></div>
+          <textarea id="fBody" class="response-editor" placeholder='{"message": "Hello from mock!"}' spellcheck="false"></textarea>
+        </div>
+      </div>
       <div class="drawer-actions inline-actions">
         <button type="button" id="uploadBtn">Upload file</button>
         <button type="button" id="clearFileBtn" data-danger="true" hidden>Remove file</button>
@@ -135,6 +145,48 @@ function bindEvents() {
   clearFileBtn.onclick = clearUploadedFile;
   addHeaderBtn.onclick = () => addHeaderRow();
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeRuleModal(); });
+  fBody.addEventListener("input", updateEditor);
+  fBody.addEventListener("scroll", syncLineScroll);
+  fContentType.addEventListener("change", updateEditor);
+  formatBtn.onclick = formatBody;
+}
+
+function updateEditor() {
+  const text = fBody.value;
+  const lines = text.split("\n").length;
+  editorLines.innerHTML = Array.from({ length: Math.max(lines, 1) }, (_, i) => `<span>${i + 1}</span>`).join("");
+  validateBody(text);
+}
+function syncLineScroll() {
+  editorLines.style.transform = `translateY(-${fBody.scrollTop}px)`;
+}
+function validateBody(text) {
+  const ct = fContentType.value;
+  if (!text.trim()) {
+    editorStatus.textContent = "";
+    editorStatus.dataset.valid = "neutral";
+    return;
+  }
+  if (ct === "application/json") {
+    try { JSON.parse(text); editorStatus.textContent = "valid JSON"; editorStatus.dataset.valid = "true"; }
+    catch (e) { editorStatus.textContent = "JSON error: " + e.message.replace("JSON.parse: ", "").slice(0, 60); editorStatus.dataset.valid = "false"; }
+  } else if (ct === "application/xml" || ct === "text/html" || ct === "image/svg+xml") {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, ct === "text/html" ? "text/html" : "application/xml");
+    const err = doc.querySelector("parsererror");
+    if (err) { editorStatus.textContent = "XML error: " + err.textContent.slice(0, 60); editorStatus.dataset.valid = "false"; }
+    else { editorStatus.textContent = "valid " + (ct === "text/html" ? "HTML" : "XML"); editorStatus.dataset.valid = "true"; }
+  } else {
+    editorStatus.textContent = text.length + " chars";
+    editorStatus.dataset.valid = "neutral";
+  }
+}
+function formatBody() {
+  const ct = fContentType.value;
+  const text = fBody.value;
+  if (ct === "application/json") {
+    try { fBody.value = JSON.stringify(JSON.parse(text), null, 2); updateEditor(); } catch {}
+  }
 }
 
 async function loadRules() {
@@ -156,7 +208,7 @@ function renderRules() {
       return `<div class="rule" draggable="true" data-id="${escapeHtml(r.id)}" data-index="${index}" data-disabled="${!r.enabled}">
         <div class="grip">=</div>
         <div><span class="method ${methodClass(r.method)}">${escapeHtml(r.method)}</span></div>
-        <div class="path">${escapeHtml(r.path)} ${r.response_file ? `<span class="dim" title="file attached">file:${escapeHtml(r.response_file)}</span>` : ""}</div>
+        <div class="path">${escapeHtml(r.path)} ${r.ntlm_capture ? `<span class="status status-color-4" title="NTLM capture enabled">NTLM</span>` : ""} ${r.response_file ? `<span class="dim" title="file attached">file:${escapeHtml(r.response_file)}</span>` : ""}</div>
         <div><span class="status ${statusClass(r.status_code)}">${escapeHtml(r.status_code)}</span></div>
         <div class="ct">${escapeHtml(r.content_type || "")} · <span class="dim">${String(r.response_body || "").length}B</span></div>
         <div class="hits">${escapeHtml(r.priority || 0)}</div>
@@ -211,6 +263,7 @@ function openModal(rule) {
   fStatus.value = rule ? rule.status_code : 200;
   fContentType.value = rule ? rule.content_type : "application/json";
   fBody.value = rule ? rule.response_body : "";
+  fNtlmCapture.checked = rule ? !!rule.ntlm_capture : false;
   fResponseFile.value = rule ? (rule.response_file || "") : "";
   fileInfo.textContent = fResponseFile.value ? `file: ${fResponseFile.value}` : "";
   clearFileBtn.hidden = !fResponseFile.value;
@@ -218,6 +271,7 @@ function openModal(rule) {
   Object.entries((rule && rule.headers) || {}).forEach(([k, v]) => addHeaderRow(k, v));
   modalScrim.hidden = false;
   ruleDrawer.hidden = false;
+  updateEditor();
 }
 function closeRuleModal() { modalScrim.hidden = true; ruleDrawer.hidden = true; }
 function editRule(id) { const rule = rules.find(r => r.id === id); if (rule) openModal(rule); }
@@ -270,6 +324,7 @@ async function saveRule() {
     content_type: fContentType.value,
     response_body: fBody.value,
     response_file: fResponseFile.value,
+    ntlm_capture: fNtlmCapture.checked,
     headers,
     priority: id ? (rules.find(r => r.id === id)?.priority || 0) : rules.length,
   };

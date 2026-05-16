@@ -80,6 +80,13 @@ class Store:
             self._conn.execute(
                 "ALTER TABLE mock_rules ADD COLUMN response_file_data BLOB DEFAULT NULL"
             )
+        # Migration: add ntlm_capture column if missing
+        try:
+            self._conn.execute("SELECT ntlm_capture FROM mock_rules LIMIT 0")
+        except Exception:
+            self._conn.execute(
+                "ALTER TABLE mock_rules ADD COLUMN ntlm_capture INTEGER NOT NULL DEFAULT 0"
+            )
         self._conn.commit()
 
     async def save(self, req: CapturedRequest):
@@ -206,6 +213,35 @@ class Store:
         cursor = self._conn.execute(sql, params)
         return cursor.fetchone()[0]
 
+    async def count_by_protocol(self) -> dict[str, int]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, self._count_by_protocol)
+
+    def _count_by_protocol(self) -> dict[str, int]:
+        cursor = self._conn.execute(
+            "SELECT protocol, COUNT(*) FROM requests "
+            "WHERE source_ip NOT IN (SELECT ip FROM blocked_ips) "
+            "GROUP BY protocol"
+        )
+        return {row[0]: row[1] for row in cursor.fetchall()}
+
+    async def recent_activity(self, minutes: int = 10, limit: int = 1000) -> list[dict]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            self._executor, self._recent_activity, minutes, limit
+        )
+
+    def _recent_activity(self, minutes: int, limit: int) -> list[dict]:
+        from datetime import datetime, timezone, timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+        cursor = self._conn.execute(
+            "SELECT timestamp, protocol FROM requests "
+            "WHERE timestamp > ? AND source_ip NOT IN (SELECT ip FROM blocked_ips) "
+            "ORDER BY timestamp DESC LIMIT ?",
+            (cutoff, limit),
+        )
+        return [{"timestamp": row[0], "protocol": row[1]} for row in cursor.fetchall()]
+
     # ── Delete requests ─────────────────────────────────────────────
 
     async def delete_request(self, request_id: str) -> bool:
@@ -275,8 +311,9 @@ class Store:
         self._conn.execute(
             """INSERT OR REPLACE INTO mock_rules
                (id, path, method, status_code, response_body, content_type,
-                headers, enabled, priority, response_file, response_file_data, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                headers, enabled, priority, response_file, response_file_data,
+                ntlm_capture, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 rule.id,
                 rule.path,
@@ -289,6 +326,7 @@ class Store:
                 rule.priority,
                 rule.response_file,
                 rule.response_file_data,
+                1 if rule.ntlm_capture else 0,
                 rule.created_at,
             ),
         )
@@ -307,6 +345,7 @@ class Store:
         for row in cursor.fetchall():
             d = dict(zip(columns, row))
             d["enabled"] = bool(d["enabled"])
+            d["ntlm_capture"] = bool(d.get("ntlm_capture", 0))
             if d.get("headers"):
                 try:
                     d["headers"] = json.loads(d["headers"])
@@ -329,6 +368,7 @@ class Store:
         columns = [desc[0] for desc in cursor.description]
         d = dict(zip(columns, row))
         d["enabled"] = bool(d["enabled"])
+        d["ntlm_capture"] = bool(d.get("ntlm_capture", 0))
         if d.get("headers"):
             try:
                 d["headers"] = json.loads(d["headers"])

