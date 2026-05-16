@@ -51,7 +51,7 @@
     <main class="main">
       <div class="toolbar">
         <select id="protoFilter"><option value="">All protocols</option></select>
-        <div class="search"><span class="prompt">FIND</span><input id="searchInput" placeholder="Search subdomain, IP, summary, details..."><span class="hint" id="matchHint">0/0</span></div>
+        <div class="search"><span class="prompt">FIND</span><input id="searchInput" placeholder="Search subdomain, IP, summary, details..."><button type="button" id="searchBtn" class="search-go">Go</button><span class="hint" id="matchHint">0/0</span></div>
         <div class="btn-row">
           <button type="button" id="clearBtn">Clear</button>
           <button type="button" id="saveSearchBtn">Save search</button>
@@ -190,6 +190,7 @@ function bindEvents() {
   document.getElementById("themeToggle").onclick = () => applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
   document.getElementById("protoFilter").onchange = () => { state.proto = protoFilter.value; state.page = 0; loadRequests(); };
   document.getElementById("searchInput").addEventListener("keydown", e => { if (e.key === "Enter") { state.search = searchInput.value.trim(); state.page = 0; loadRequests(); } });
+  document.getElementById("searchBtn").onclick = () => { state.search = searchInput.value.trim(); state.page = 0; loadRequests(); };
   document.getElementById("clearBtn").onclick = clearFilters;
   document.getElementById("saveSearchBtn").onclick = saveCurrentSearch;
   document.getElementById("exportBtn").onclick = () => downloadJson("pega-pega-requests.json", { filters: { protocol: state.proto, search: state.search }, requests: state.rows });
@@ -269,7 +270,8 @@ function spark(proto) {
   }).join("");
 }
 
-async function loadRequests() {
+async function loadRequests(flashNew = false) {
+  const prevIds = new Set(state.rows.map(r => r.id));
   const params = new URLSearchParams({ limit: PAGE_SIZE, offset: state.page * PAGE_SIZE });
   if (state.proto) params.set("protocol", state.proto);
   if (state.search) params.set("search", state.search);
@@ -277,7 +279,8 @@ async function loadRequests() {
   if (!data) return;
   state.rows = data.requests || [];
   state.total = data.total || 0;
-  renderRows();
+  const newIds = flashNew ? new Set(state.rows.filter(r => !prevIds.has(r.id)).map(r => r.id)) : new Set();
+  renderRows(newIds);
   renderPagination();
   loadStats();
 }
@@ -479,7 +482,7 @@ function connectWS() {
       if (state.page === 0 && !state.proto && !state.search) {
         state.rows.unshift(req); state.rows = state.rows.slice(0, PAGE_SIZE); state.total += 1; renderRows(new Set([req.id]));
       } else {
-        loadRequests();
+        loadRequests(true);
       }
       scheduleStatsRefresh();
     } catch (e) { console.error(e); }

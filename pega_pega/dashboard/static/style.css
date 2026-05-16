@@ -362,11 +362,12 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   height: 28px;
   border: 1px solid var(--rule-strong);
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
 }
 .toolbar .search input { border: 0; width: 100%; }
 .toolbar .search .prompt { padding: 0 8px; color: var(--accent); font-weight: 700; }
+.toolbar .search .search-go { border: 0; border-left: 1px solid var(--rule-strong); height: 100%; padding: 0 10px; font-size: 11px; }
 .toolbar .search .hint { padding: 0 8px; color: var(--fg-dim); font-size: 10px; letter-spacing: 0.08em; }
 .toolbar .btn-row { display: flex; gap: 0; }
 .toolbar .btn-row button { height: 28px; padding: 0 10px; border-right: 0; }
