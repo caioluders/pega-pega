@@ -1,6 +1,6 @@
 # pega-pega
 
-Multi-protocol request logger and catcher. Listens on **14 protocols**, logs every incoming request, and displays them in a terminal-style web dashboard and terminal UI.
+Multi-protocol request catcher. **14 protocols**, web dashboard, NTLM hash capture, mock HTTP endpoints.
 
 ```
   ____  _____ ____    _        ____  _____ ____    _
@@ -12,19 +12,11 @@ Multi-protocol request logger and catcher. Listens on **14 protocols**, logs eve
 
 ## Screenshots
 
-### Dashboard
 <p align="center">
   <img src="screenshots/dashboard.png" alt="Dashboard" width="100%">
 </p>
-
-### Mock Endpoints
 <p align="center">
   <img src="screenshots/mock.png" alt="Mock Endpoints" width="100%">
-</p>
-
-### Terminal UI
-<p align="center">
-  <img src="screenshots/cli.svg" alt="Terminal UI" width="100%">
 </p>
 
 ## Install
@@ -37,117 +29,96 @@ curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh
   --password s3cret
 ```
 
-All flags are optional — running without arguments uses sensible defaults (domain `pega.local`, auto-detect IP, no auth).
-
-After install, point a wildcard DNS record (`*.yourdomain.com`) to your server.
+Point a wildcard DNS record (`*.yourdomain.com`) to your server.
 
 <details>
-<summary>Install options</summary>
+<summary>Options & service management</summary>
 
 ```
---domain, -d DOMAIN    Base domain for subdomain tracking (default: pega.local)
---ip, -i IP            Response IP for DNS queries (default: auto-detect)
+--domain, -d DOMAIN    Base domain (default: pega.local)
+--ip, -i IP            Response IP for DNS (default: auto-detect)
 --dashboard PORT       Web dashboard port (default: 8443)
 --password PASS        Dashboard password (empty = no auth)
---letsencrypt          Enable Let's Encrypt SSL via certbot
+--letsencrypt          SSL via certbot
 --email, -e EMAIL      Email for Let's Encrypt
 --no-service           Don't create systemd service
 --update               Update existing installation
 --uninstall            Remove completely
 ```
-</details>
-
-<details>
-<summary>Service management</summary>
 
 ```bash
-journalctl -u pega-pega -f          # live logs
-systemctl restart pega-pega         # restart
-vim /etc/pega-pega/config.yaml      # edit config
-
-# update
-curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh | sudo bash -s -- --update
-
-# uninstall
-curl -sSL https://raw.githubusercontent.com/caioluders/pega-pega/main/install.sh | sudo bash -s -- --uninstall
+journalctl -u pega-pega -f      # logs
+systemctl restart pega-pega     # restart
+vim /etc/pega-pega/config.yaml  # config
 ```
 </details>
 
 ## Usage
 
 ```bash
-sudo pega-pega                          # all protocols (needs root for ports < 1024)
-pega-pega -p http,dns,ftp               # specific protocols only
-pega-pega -d yourdomain.com -r 1.2.3.4  # custom domain and response IP
-pega-pega --no-dashboard                # disable web dashboard
+sudo pega-pega                          # all protocols (root for ports < 1024)
+pega-pega -p http,dns,ftp               # specific protocols
+pega-pega -d yourdomain.com -r 1.2.3.4  # custom domain + IP
+pega-pega --no-dashboard                # headless
 ```
-
-<details>
-<summary>CLI options</summary>
-
-```
--c, --config PATH        Path to config YAML
--b, --bind IP            Bind address (default: 0.0.0.0)
--d, --domain DOMAIN      Base domain for subdomain tracking
--r, --response-ip IP     IP for DNS responses (auto-detect if not set)
---dashboard-port PORT    Dashboard port (default: 8443)
---db PATH                SQLite database path
---no-dashboard           Disable web dashboard
--p, --protocols LIST     Comma-separated protocols to enable
--v, --verbose            Verbose logging
-```
-</details>
 
 ## Protocols
 
-| Protocol | Port | What's captured |
-|----------|------|-----------------|
+| Protocol | Port | Captured |
+|----------|------|----------|
 | HTTP | 80 (+8080, 8888, 3000, 5000, 8000, 8081) | Method, path, headers, body |
-| HTTPS | 443 (+4443, 9443) | Same as HTTP (auto-generated wildcard cert) |
-| DNS | 53 | Query name, type — responds with your IP |
+| HTTPS | 443 (+4443, 9443) | Same as HTTP (wildcard cert) |
+| DNS | 53 | Query name/type, responds with your IP |
 | FTP | 21 | Credentials, commands |
-| SMTP | 25 | EHLO, AUTH, envelope, mail body |
+| SMTP | 25 | EHLO, AUTH, envelope, body |
 | POP3 | 110 | Login credentials |
 | IMAP | 143 | Login credentials, commands |
-| SSH | 22 | Password and pubkey auth attempts |
+| SSH | 22 | Password + pubkey auth attempts |
 | Telnet | 23 | Credentials, raw input |
-| LDAP | 389 | Bind DN/credentials, search queries |
+| LDAP | 389 | Bind DN/creds, search queries |
 | MySQL | 3306 | Username, database, auth data |
-| Raw TCP | 9999 | Hex dump of raw bytes |
+| Raw TCP | 9999 | Hex dump |
 | SNMP | 161 | Community strings, OIDs |
 | Syslog | 514 | Facility, severity, message |
 
-All handlers return **realistic responses** to encourage clients to send full payloads.
+All handlers return realistic responses to keep clients talking.
 
 ## Features
 
-- **Revamped web dashboard** — terminal-style request log with one-line protocol stats, live request graphs, quick filters, saved searches, and WebSocket updates
-- **Request detail drawer** — inspect parsed fields, headers, body, raw payload, and hex without leaving the log
-- **Request actions** — block IPs, delete individual entries, export requests, copy curl commands, and bulk clear
-- **Action column** — separates request verbs/operations like GET, POST, QUERY, LOGIN, and BIND from the target summary
-- **IP blocking** — blocked IPs are filtered from all views, counts, and stats
-- **Subdomain tracking** — DNS resolves all subdomains to your IP, HTTP extracts subdomain from Host header
-- **Dashboard auth** — optional password protection
-- **Let's Encrypt** — automatic SSL certificates via certbot
+- **Web dashboard** — live request log, protocol stats, sparkline graphs, WebSocket updates
+- **Request detail drawer** — parsed fields, headers, body, hex dump, copy curl
+- **NTLM hash capture** — force NTLM auth on mock endpoints, extract NTLMv2 hashes (Hashcat 5600 / John netntlmv2)
+- **Mock HTTP endpoints** — custom responses with path patterns, status codes, headers, file uploads, code editor with JSON/XML validation
+- **Subdomain tracking** — wildcard DNS + Host header extraction
+- **IP blocking** — filter noise from all views/stats
+- **Let's Encrypt** — auto SSL via certbot
 - **SQLite persistence** — all requests stored and queryable
-- **Configurable** — YAML config to enable/disable protocols, remap ports, set bind addresses
+- **Dashboard auth** — optional password protection
+
+## NTLM Hash Capture
+
+Enable "Capture NTLM hash" on any mock rule. The handler performs a full NTLM handshake over keep-alive:
+
+1. Client request → `401 + WWW-Authenticate: NTLM`
+2. Client Type 1 → Server Type 2 (challenge)
+3. Client Type 3 → **hash extracted**, shown in request details
+
+Output format (Hashcat mode 5600):
+```
+user::DOMAIN:server_challenge:nt_proof_str:blob
+```
+
+Works with browsers (intranet zone), curl `--ntlm`, and any NTLM-capable client.
 
 ## Mock HTTP Endpoints
 
-Define custom HTTP responses at `/mock` on the dashboard. Requests matching a mock rule get your configured response; they're still captured in the main log.
+Configure at `/mock` on the dashboard.
 
-The mock-rules page includes search, drag-and-drop priority ordering, enable/disable toggles, import/export, file-backed responses, custom headers, and a drawer editor. Settings are available from the same top navigation as the dashboard.
-
-**Path patterns:**
-- Exact: `/api/users`, `/health`
-- Param wildcard: `/api/users/:id` — matches any single segment (`/api/users/123`)
-- Star wildcard: `/static/*` — matches anything after prefix
-
-**Method matching:** filter by GET, POST, PUT, DELETE, PATCH — or use ANY to match all methods.
-
-**Custom responses:** set status code (200, 404, 500...), response body, Content-Type, arbitrary headers, or upload a binary/text file to serve from SQLite.
-
-**Priority:** rules are evaluated top-down — first match wins. Drag to reorder in the UI. Rules can be toggled on/off without deleting.
+- **Path patterns:** `/exact`, `/api/:id` (segment wildcard), `/static/*` (catch-all)
+- **Method filter:** GET, POST, PUT, DELETE, PATCH, or ANY
+- **Response:** status code, body (with syntax validation), Content-Type, custom headers, file upload
+- **Priority:** top-down, first match wins, drag to reorder
+- **NTLM:** per-rule toggle to force NTLM authentication and capture hashes
 
 ## Configuration
 
@@ -166,7 +137,7 @@ protocols:
     enabled: true
     port: 80
     extra_ports: [8080, 8888, 3000, 5000, 8000, 8081]
-  # ... 14 protocols total — see config.default.yaml
+  # ... see config.default.yaml
 ```
 
 ## Development
@@ -181,29 +152,9 @@ sudo pega-pega
 ## Architecture
 
 ```
-pega_pega/
-├── models.py            # CapturedRequest, MockRule, Protocol enum
-├── bus.py               # Async fan-out event bus
-├── store.py             # SQLite persistence + blocked IPs
-├── mock.py              # Mock rule matcher (path/method patterns → regex)
-├── display.py           # Rich terminal live table
-├── server.py            # Main orchestrator
-├── cli.py               # Click CLI
-├── config.py            # YAML config loading
-├── certs.py             # Self-signed certificate generation
-├── letsencrypt.py       # Let's Encrypt / certbot integration
-├── protocols/           # 14 protocol handlers
-│   ├── base.py          # BaseProtocolHandler ABC
-│   ├── http_handler.py
-│   ├── dns_handler.py
-│   └── ...
-├── dashboard/           # FastAPI web dashboard
-│   ├── app.py
-│   └── templates/
-│       ├── index.html   # Main dashboard
-│       ├── mock.html    # Mock rules page
-│       └── login.html   # Login page
-└── utils/               # DNS/LDAP/SNMP wire-format parsers
+Protocol Handlers → EventBus → Store (SQLite)
+                             → Terminal Display (Rich)
+                             → Dashboard WebSocket (live updates)
 ```
 
-Every protocol handler publishes `CapturedRequest` events to a central async event bus. Consumers (SQLite store, terminal display, WebSocket broadcaster) each subscribe independently.
+14 async protocol handlers publish `CapturedRequest` events to a fan-out bus. Consumers (store, display, WebSocket) subscribe independently.
