@@ -146,7 +146,6 @@
       </div>
       <div id="autoBlockedInfo" class="dim" style="margin-top:8px"></div>
       <div class="drawer-actions inline-actions">
-        <button type="button" data-variant="primary" id="btnApplyFilters">Apply filters</button>
         <button type="button" id="btnClearRateBlocks">Clear rate-limit blocks</button>
         <span id="filterStatus" class="dim"></span>
       </div>
@@ -169,6 +168,7 @@ const PROTOCOLS = ["HTTP","HTTPS","DNS","FTP","SMTP","POP3","IMAP","SSH","TELNET
 const PAGE_SIZE = 100;
 let state = { page: 0, proto: "", search: "", total: 0, rows: [], selected: null, paused: false, stream: [], recentEvents: [], statsData: null, configLoaded: false };
 let ws = null;
+let _savedServerConfig = null;
 let _statsTimer = null;
 function scheduleStatsRefresh() {
   if (_statsTimer) return;
@@ -233,7 +233,6 @@ function bindEvents() {
   document.getElementById("cfgRateLimit").onchange = () => { rateLimitOpts.style.display = cfgRateLimit.checked ? "" : "none"; };
   document.getElementById("cfgBotFilter").onchange = () => { botFilterOpts.style.display = cfgBotFilter.checked ? "" : "none"; };
   document.getElementById("cfgAllowlist").onchange = () => { allowlistOpts.style.display = cfgAllowlist.checked ? "" : "none"; };
-  document.getElementById("btnApplyFilters").onclick = async () => { await saveFilters(); filterStatus.textContent = "Applied"; setTimeout(() => filterStatus.textContent = "", 2000); };
   document.getElementById("btnClearRateBlocks").onclick = async () => { await fetch("/api/filters/clear-rate-blocks", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); filterStatus.textContent = "Cleared"; loadFilters(); };
   document.getElementById("logoutBtn").onclick = doLogout;
   document.addEventListener("keydown", e => { if (e.key === "Escape") { closeDrawer(); closeSettings(); } });
@@ -542,6 +541,7 @@ async function loadConfig(silent) {
   cfgLeEmail.value = (cfg.letsencrypt && cfg.letsencrypt.email) || "";
   logoutBtn.style.display = cfg.password_set ? "" : "none";
   protocolToggles.innerHTML = Object.entries(cfg.protocols || {}).map(([name, proto]) => `<label class="settings-row"><span><span class="p-tag" style="--p-c:${protoVar(name.toUpperCase())}">${escapeHtml(name.toUpperCase())}</span><span class="dim"> :${escapeHtml(proto.port || "")}</span></span><input type="checkbox" data-proto="${escapeHtml(name)}" ${proto.enabled ? "checked" : ""}></label>`).join("");
+  _savedServerConfig = { domain: cfg.domain || "", response_ip: cfg.response_ip || "", bind_ip: cfg.bind_ip || "", dashboard_port: cfg.dashboard_port || 8443, le_enabled: !!(cfg.letsencrypt && cfg.letsencrypt.enabled), le_email: (cfg.letsencrypt && cfg.letsencrypt.email) || "", protocols: Object.fromEntries(Object.entries(cfg.protocols || {}).map(([k, v]) => [k, v.enabled])) };
   loadLeStatus();
   loadFilters();
 }
@@ -549,9 +549,18 @@ function openSettings() { settingsScrim.hidden = false; settingsDrawer.hidden = 
 function closeSettings() { settingsScrim.hidden = true; settingsDrawer.hidden = true; }
 async function saveConfig() {
   saveStatus.textContent = "Saving...";
-  // Save filters first (applies immediately, no restart)
+  // Always save filters (instant, no restart)
   await saveFilters();
-  // Then save server config (may trigger restart)
+  // Check if server config actually changed
+  const currentProtos = {};
+  protocolToggles.querySelectorAll("input[data-proto]").forEach(cb => currentProtos[cb.dataset.proto] = cb.checked);
+  const current = { domain: cfgDomain.value, response_ip: cfgResponseIp.value, bind_ip: cfgBindIp.value, dashboard_port: Number(cfgDashboardPort.value) || 8443, le_enabled: cfgLeEnabled.checked, le_email: cfgLeEmail.value, protocols: currentProtos };
+  const serverChanged = !_savedServerConfig || cfgPassword.value || JSON.stringify(current) !== JSON.stringify(_savedServerConfig);
+  if (!serverChanged) {
+    saveStatus.textContent = "Saved";
+    return;
+  }
+  // Server config changed — save (may trigger restart)
   const body = { domain: cfgDomain.value, response_ip: cfgResponseIp.value, bind_ip: cfgBindIp.value, dashboard_port: Number(cfgDashboardPort.value) || 8443, letsencrypt: { enabled: cfgLeEnabled.checked, email: cfgLeEmail.value, agree_tos: cfgLeEnabled.checked }, protocols: {} };
   if (cfgPassword.value) body.dashboard_password = cfgPassword.value;
   protocolToggles.querySelectorAll("input[data-proto]").forEach(cb => body.protocols[cb.dataset.proto] = { enabled: cb.checked });
@@ -563,6 +572,7 @@ async function saveConfig() {
       setTimeout(() => location.reload(), 4000);
     } else {
       saveStatus.textContent = resp.ok ? "Saved" : "Save failed";
+      _savedServerConfig = current;
     }
   } catch {
     saveStatus.innerHTML = '<span class="spinner"></span> Saved. Reconnecting...';
