@@ -134,7 +134,11 @@
           <label>Max requests<input id="cfgRateMax" type="number" min="1" value="50"></label>
           <label>Window (seconds)<input id="cfgRateWindow" type="number" min="5" value="60"></label>
         </div>
-        <label class="settings-check"><input id="cfgBotFilter" type="checkbox"> Hide known bots/scanners</label>
+        <label class="settings-check"><input id="cfgBotFilter" type="checkbox"> Filter known bots/scanners</label>
+        <div id="botFilterOpts" style="display:none;padding-left:20px">
+          <label class="settings-check"><input type="radio" name="botAction" id="cfgBotBlock" checked> Block (drop requests)</label>
+          <label class="settings-check"><input type="radio" name="botAction" id="cfgBotTag"> Tag only (still capture)</label>
+        </div>
         <label class="settings-check"><input id="cfgAllowlist" type="checkbox"> IP allowlist (drop all others)</label>
         <div id="allowlistOpts" style="display:none">
           <label>Allowed IPs/CIDRs <span class="dim">(one per line)</span><textarea id="cfgAllowlistIps" style="min-height:60px;width:100%;resize:vertical" placeholder="192.168.1.0/24&#10;10.0.0.5"></textarea></label>
@@ -226,6 +230,7 @@ function bindEvents() {
   document.getElementById("btnLeCert").onclick = requestLeCert;
   document.getElementById("btnUpdate").onclick = triggerUpdate;
   document.getElementById("cfgRateLimit").onchange = () => { rateLimitOpts.style.display = cfgRateLimit.checked ? "" : "none"; };
+  document.getElementById("cfgBotFilter").onchange = () => { botFilterOpts.style.display = cfgBotFilter.checked ? "" : "none"; };
   document.getElementById("cfgAllowlist").onchange = () => { allowlistOpts.style.display = cfgAllowlist.checked ? "" : "none"; };
   document.getElementById("btnClearRateBlocks").onclick = async () => { await fetch("/api/filters/clear-rate-blocks", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); filterStatus.textContent = "Cleared"; loadFilters(); };
   document.getElementById("logoutBtn").onclick = doLogout;
@@ -557,6 +562,9 @@ async function loadFilters() {
   cfgRateMax.value = f.rate_limit_max_requests || 50;
   cfgRateWindow.value = f.rate_limit_window || 60;
   cfgBotFilter.checked = f.bot_filter_enabled;
+  botFilterOpts.style.display = f.bot_filter_enabled ? "" : "none";
+  cfgBotBlock.checked = f.bot_filter_block !== false;
+  cfgBotTag.checked = f.bot_filter_block === false;
   cfgAllowlist.checked = f.allowlist_enabled;
   cfgAllowlistIps.value = (f.allowlist_ips || []).join("\n");
   rateLimitOpts.style.display = f.rate_limit_enabled ? "" : "none";
@@ -570,6 +578,7 @@ async function saveFilters() {
     rate_limit_window: Number(cfgRateWindow.value) || 60,
     rate_limit_max_requests: Number(cfgRateMax.value) || 50,
     bot_filter_enabled: cfgBotFilter.checked,
+    bot_filter_block: cfgBotBlock.checked,
     allowlist_enabled: cfgAllowlist.checked,
     allowlist_ips: cfgAllowlistIps.value.split("\n").map(s => s.trim()).filter(Boolean),
   };

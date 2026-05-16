@@ -83,6 +83,7 @@ class FilterConfig:
 
     # Bot detection
     bot_filter_enabled: bool = False
+    bot_filter_block: bool = True  # True = block, False = tag only
 
     # IP allowlist
     allowlist_enabled: bool = False
@@ -94,6 +95,7 @@ class FilterConfig:
             "rate_limit_window": self.rate_limit_window,
             "rate_limit_max_requests": self.rate_limit_max_requests,
             "bot_filter_enabled": self.bot_filter_enabled,
+            "bot_filter_block": self.bot_filter_block,
             "allowlist_enabled": self.allowlist_enabled,
             "allowlist_ips": self.allowlist_ips,
         }
@@ -105,6 +107,7 @@ class FilterConfig:
             rate_limit_window=int(data.get("rate_limit_window", 60)),
             rate_limit_max_requests=int(data.get("rate_limit_max_requests", 50)),
             bot_filter_enabled=bool(data.get("bot_filter_enabled", False)),
+            bot_filter_block=bool(data.get("bot_filter_block", True)),
             allowlist_enabled=bool(data.get("allowlist_enabled", False)),
             allowlist_ips=data.get("allowlist_ips", []),
         )
@@ -145,10 +148,12 @@ class RequestFilter:
             if self._check_rate_limit(source_ip):
                 return FilterResult(action="block", reason="rate limit exceeded")
 
-        # Bot detection (tag, don't drop — user can choose to hide)
+        # Bot detection
         if self.config.bot_filter_enabled and details:
             bot_reason = self._detect_bot(details)
             if bot_reason:
+                if self.config.bot_filter_block:
+                    return FilterResult(action="drop", reason=bot_reason)
                 return FilterResult(action="tag", reason=bot_reason, tag="bot")
 
         return FilterResult(action="accept")
